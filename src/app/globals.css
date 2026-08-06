@@ -1,26 +1,113 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-outline: #77767b;
+  --color-on-tertiary-container: #85847f;
+  --color-surface-container-high: #ebe7e7;
+  --color-inverse-on-surface: #f4f0ef;
+  --color-outline-variant: #c7c6ca;
+  --color-inverse-primary: #c8c6c8;
+  --color-on-tertiary-fixed: #1c1c18;
+  --color-tertiary-fixed-dim: #c9c6c1;
+  --color-secondary: #645d54;
+  --color-primary: #000000;
+  --color-on-error-container: #93000a;
+  --color-background: #fdf8f8;
+  --color-on-tertiary: #ffffff;
+  --color-on-secondary-container: #6a6359;
+  --color-surface-container-highest: #e5e2e1;
+  --color-error: #ba1a1a;
+  --color-on-surface-variant: #46464a;
+  --color-secondary-container: #ebe1d4;
+  --color-on-tertiary-fixed-variant: #474743;
+  --color-on-secondary-fixed-variant: #4c463d;
+  --color-surface-dim: #ddd9d9;
+  --color-on-error: #ffffff;
+  --color-tertiary-container: #1c1c18;
+  --color-on-primary: #ffffff;
+  --color-surface-bright: #fdf8f8;
+  --color-on-primary-fixed: #1b1b1d;
+  --color-primary-fixed: #e4e2e4;
+  --color-secondary-fixed-dim: #cec5b9;
+  --color-on-primary-fixed-variant: #474649;
+  --color-error-container: #ffdad6;
+  --color-secondary-fixed: #ebe1d4;
+  --color-on-secondary-fixed: #1f1b13;
+  --color-tertiary: #000000;
+  --color-on-secondary: #ffffff;
+  --color-surface-container: #f1edec;
+  --color-primary-container: #1b1b1d;
+  --color-on-primary-container: #858386;
+  --color-surface-tint: #5f5e60;
+  --color-surface: #fdf8f8;
+  --color-surface-container-low: #f7f3f2;
+  --color-on-surface: #1c1b1b;
+  --color-primary-fixed-dim: #c8c6c8;
+  --color-surface-container-lowest: #ffffff;
+  --color-inverse-surface: #313030;
+  --color-surface-variant: #e5e2e1;
+  --color-tertiary-fixed: #e5e2dc;
+  --color-on-background: #1c1b1b;
+
+  --spacing-container-padding: 2rem;
+  --spacing-stack-lg: 2rem;
+  --spacing-stack-md: 1rem;
+  --spacing-margin-page: 2rem;
+  --spacing-stack-sm: 0.5rem;
+  --spacing-gutter: 1.5rem;
+
+  --font-stats-display: "Inter", sans-serif;
+  --font-headline-lg-mobile: "Inter", sans-serif;
+  --font-headline-lg: "Inter", sans-serif;
+  --font-headline-md: "Inter", sans-serif;
+  --font-label-caps: "Inter", sans-serif;
+  --font-body-lg: "Inter", sans-serif;
+  --font-body-md: "Inter", sans-serif;
+
+  --text-stats-display: 48px;
+  --text-stats-display--line-height: 48px;
+  --text-stats-display--letter-spacing: -0.04em;
+  --text-stats-display--font-weight: 700;
+
+  --text-headline-lg-mobile: 24px;
+  --text-headline-lg-mobile--line-height: 32px;
+  --text-headline-lg-mobile--font-weight: 600;
+
+  --text-headline-lg: 32px;
+  --text-headline-lg--line-height: 40px;
+  --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-md: 20px;
+  --text-headline-md--line-height: 28px;
+  --text-headline-md--font-weight: 600;
+
+  --text-label-caps: 12px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--letter-spacing: 0.05em;
+  --text-label-caps--font-weight: 600;
+
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 24px;
+  --text-body-lg--font-weight: 400;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer utilities {
+  .mesh-gradient-bg {
+    background: radial-gradient(circle at 70% 50%, rgba(255, 218, 107, 0.6) 0%, transparent 60%),
+                radial-gradient(circle at 30% 70%, rgba(255, 107, 107, 0.4) 0%, transparent 50%);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    @apply bg-surface-container-high text-on-surface font-body-md antialiased selection:bg-primary selection:text-on-primary;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
 }

@@ -1,0 +1,184 @@
+export interface Workstation {
+  id: string;
+  name: string;
+  line: string;
+  status: 'Operational' | 'At Risk' | 'Under Maintenance' | 'Down' | 'Recovered';
+  currentJob: string;
+  capacity: number;
+  temperature: number;
+  vibration: number;
+  pressure: number;
+  cycleCount: number;
+  motorCurrent: number;
+  errorLogsCount: number;
+  health: 'Healthy' | 'Good' | 'Degraded' | 'Critical';
+  failureProb: number;
+  predictedComponent: string;
+  estimatedTTF: string;
+  rul: string;
+  lastMaintenance: string;
+  activeCaseId?: string;
+  historyLogs: Array<{ date: string; description: string }>;
+  eventLogs: Array<{ time: string; event: string; type: 'warn' | 'error' | 'info' }>;
+}
+
+export const MOCK_WORKSTATIONS: Workstation[] = [
+  {
+    id: 'WS-102',
+    name: 'CNC Lathe Alpha',
+    line: 'L-03',
+    status: 'At Risk',
+    currentJob: 'J1001',
+    capacity: 45,
+    temperature: 84.5,
+    vibration: 4.1,
+    pressure: 6.2,
+    cycleCount: 45230,
+    motorCurrent: 18.4,
+    errorLogsCount: 3,
+    health: 'Critical',
+    failureProb: 92,
+    predictedComponent: 'Servo Motor Bearing',
+    estimatedTTF: '18 Hours',
+    rul: '22 Hours',
+    lastMaintenance: '12-May 2026',
+    activeCaseId: 'FC-2024-0047',
+    historyLogs: [
+      { date: '12-May 2026', description: 'Bearing Lubrication & Calibration' },
+      { date: '14-Jan 2026', description: 'Spindle Shaft Realignment' },
+      { date: '02-Oct 2025', description: 'Coolant Pump Replacement' },
+    ],
+    eventLogs: [
+      { time: '03:14 IST', event: 'Vibration threshold breached (>3.5 mm/s)', type: 'error' },
+      { time: '02:50 IST', event: 'Motor temperature spike (84.5°C)', type: 'warn' },
+      { time: '01:10 IST', event: 'Error Log #E-409 generated', type: 'error' },
+    ]
+  },
+  {
+    id: 'WS-108',
+    name: 'Robotic Arm Beta',
+    line: 'L-01',
+    status: 'At Risk',
+    currentJob: 'J1002',
+    capacity: 55,
+    temperature: 78.2,
+    vibration: 3.2,
+    pressure: 5.8,
+    cycleCount: 89100,
+    motorCurrent: 14.1,
+    errorLogsCount: 1,
+    health: 'Degraded',
+    failureProb: 68,
+    predictedComponent: 'Actuator Joint B',
+    estimatedTTF: '36 Hours',
+    rul: '42 Hours',
+    lastMaintenance: '28-Jun 2026',
+    activeCaseId: 'FC-2024-0052',
+    historyLogs: [
+      { date: '28-Jun 2026', description: 'Joint Actuator Inspection' },
+      { date: '10-Feb 2026', description: 'Firmware Update v4.2' },
+    ],
+    eventLogs: [
+      { time: '04:05 IST', event: 'Actuator harmonic oscillation detected', type: 'warn' },
+    ]
+  },
+  {
+    id: 'WS-112',
+    name: 'Conveyor Line Gamma',
+    line: 'L-02',
+    status: 'Operational',
+    currentJob: 'J1003',
+    capacity: 88,
+    temperature: 42.1,
+    vibration: 1.1,
+    pressure: 4.0,
+    cycleCount: 124000,
+    motorCurrent: 9.5,
+    errorLogsCount: 0,
+    health: 'Healthy',
+    failureProb: 12,
+    predictedComponent: '—',
+    estimatedTTF: '—',
+    rul: '—',
+    lastMaintenance: '01-Jul 2026',
+    historyLogs: [
+      { date: '01-Jul 2026', description: 'Belt Tension Alignment' }
+    ],
+    eventLogs: [
+      { time: '00:00 IST', event: 'Normal operational cycle ongoing', type: 'info' }
+    ]
+  },
+  {
+    id: 'WS-205',
+    name: 'Packaging Unit Delta',
+    line: 'L-04',
+    status: 'Operational',
+    currentJob: 'J1005',
+    capacity: 92,
+    temperature: 38.6,
+    vibration: 0.9,
+    pressure: 6.0,
+    cycleCount: 63200,
+    motorCurrent: 8.2,
+    errorLogsCount: 0,
+    health: 'Good',
+    failureProb: 8,
+    predictedComponent: '—',
+    estimatedTTF: '—',
+    rul: '—',
+    lastMaintenance: '15-May 2026',
+    historyLogs: [
+      { date: '15-May 2026', description: 'Pneumatic Seal Replacement' }
+    ],
+    eventLogs: []
+  },
+  {
+    id: 'WS-105',
+    name: 'Precision Milling Center',
+    line: 'L-03',
+    status: 'Operational',
+    currentJob: '—',
+    capacity: 75,
+    temperature: 45.0,
+    vibration: 1.4,
+    pressure: 5.5,
+    cycleCount: 31000,
+    motorCurrent: 11.0,
+    errorLogsCount: 0,
+    health: 'Healthy',
+    failureProb: 15,
+    predictedComponent: '—',
+    estimatedTTF: '—',
+    rul: '—',
+    lastMaintenance: '20-Jun 2026',
+    historyLogs: [],
+    eventLogs: []
+  },
+  {
+    id: 'WS-110',
+    name: 'Laser Cutter Sigma',
+    line: 'L-02',
+    status: 'Under Maintenance',
+    currentJob: '—',
+    capacity: 0,
+    temperature: 25.0,
+    vibration: 0.0,
+    pressure: 0.0,
+    cycleCount: 104200,
+    motorCurrent: 0.0,
+    errorLogsCount: 2,
+    health: 'Critical',
+    failureProb: 98,
+    predictedComponent: 'Optical Lens Array',
+    estimatedTTF: '0 Hours',
+    rul: '0 Hours',
+    lastMaintenance: '05-Aug 2026',
+    activeCaseId: 'FC-2024-0041',
+    historyLogs: [
+      { date: '05-Aug 2026', description: 'Scheduled Lens Replacement initiated' }
+    ],
+    eventLogs: [
+      { time: '10:00 IST', event: 'Work Order WO-2024-0312 in progress', type: 'info' }
+    ]
+  }
+];
