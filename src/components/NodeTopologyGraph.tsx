@@ -1,5 +1,6 @@
 "use client";
 
+// demo_data
 import { Workstation } from "@/data/workstations";
 import { AlertOctagon, Activity, ShieldAlert, Cpu } from "lucide-react";
 

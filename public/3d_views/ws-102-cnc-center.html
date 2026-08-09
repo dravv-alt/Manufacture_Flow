@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WS-102 CNC Machining Center — Exploded View</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+<style>
+  :root{
+    --beige: #E7E1D2;
+    --beige-deep: #DAD2BE;
+    --ink: #2A2823;
+    --ink-soft: #55503f;
+    --rust: #B5651D;
+    --hud-bg: rgba(20,18,14,0.92);
+    --risk: #FF3B2F;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--beige);
+    color:var(--ink);
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x:hidden;
+  }
+  #scroll-spacer{
+    height: 420vh;
+    position:relative;
+  }
+  #stage{
+    position:fixed;
+    top:0; left:0;
+    width:100%; height:100vh;
+    overflow:hidden;
+  }
+  canvas#gl{
+    display:block;
+    width:100%; height:100%;
+    cursor:grab;
+    touch-action:none;
+  }
+  canvas#gl:active{ cursor:grabbing; }
+
+  .corner-label{
+    position:absolute;
+    z-index:5;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    pointer-events:none;
+    line-height:1.6;
+  }
+  #label-top{
+    top:28px; left:32px;
+    max-width: 280px;
+  }
+  #label-top .title{
+    font-size:13px;
+    color:var(--ink);
+    font-weight:600;
+    margin-bottom:6px;
+    letter-spacing:0.08em;
+  }
+  #label-plate{
+    top:28px; right:32px;
+    text-align:right;
+  }
+  #label-plate div{ opacity:0.75; }
+  #label-plate .idx{ color:var(--rust); font-weight:700; opacity:1; }
+
+  /* Premium Side Details Panel */
+  #side-panel {
+    position: absolute;
+    top: 0; right: -420px;
+    width: 380px; height: 100vh;
+    background: rgba(20, 18, 14, 0.95);
+    border-left: 2px solid var(--rust);
+    padding: 32px 24px;
+    color: var(--beige);
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    z-index: 100;
+    transition: right 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  #side-panel.open {
+    right: 0;
+  }
+  .panel-header {
+    border-bottom: 1px solid #3a342a;
+    padding-bottom: 20px;
+  }
+  .panel-title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+  .panel-subtitle {
+    font-size: 11px;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+  }
+  .panel-body {
+    flex-grow: 1;
+    padding: 30px 0;
+  }
+  .risk-badge {
+    background: rgba(255, 59, 47, 0.15);
+    border: 1px solid var(--risk);
+    color: var(--risk);
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: bold;
+    display: inline-block;
+    border-radius: 4px;
+    margin-bottom: 24px;
+    letter-spacing: 0.08em;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    font-size: 12px;
+  }
+  .metric-label {
+    color: var(--beige-deep);
+    opacity: 0.8;
+  }
+  .metric-val {
+    font-weight: bold;
+    color: #fff;
+  }
+
+  /* HUD */
+  #hud{
+    position:absolute;
+    bottom:26px; left:32px;
+    z-index:10;
+    width:320px;
+    background:var(--hud-bg);
+    border-radius:10px;
+    padding:14px 16px 12px;
+    color:#D8D3C4;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px);
+    user-select:none;
+  }
+  #hud-header{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
+    color:#8f8a78; margin-bottom:10px;
+  }
+  #hud-header .pct{ color:var(--rust); font-weight:700; }
+  #hud-track-wrap{ position:relative; height:24px; }
+  #hud-ticks{
+    position:absolute; top:0; left:0; right:0; height:8px;
+    display:flex; justify-content:space-between;
+  }
+  #hud-ticks span{ width:1px; height:6px; background:#4a4636; }
+  #hud-ticks span.major{ height:8px; background:#6b664f; }
+  #hud-track{
+    position:absolute; top:12px; left:0; right:0; height:2px;
+    background:#3a362a; border-radius:1px; cursor:pointer;
+  }
+  #hud-fill{
+    position:absolute; top:0; left:0; height:100%;
+    background:var(--rust); border-radius:1px;
+    width:0%;
+  }
+  #hud-playhead{
+    position:absolute; top:12px; left:0%;
+    width:11px; height:11px; margin-left:-5.5px; margin-top:-4.5px;
+    background:var(--rust);
+    transform:rotate(45deg);
+    border:2px solid #efe9d8;
+    cursor:grab;
+  }
+  #hud-playhead:active{ cursor:grabbing; }
+  #hud-footer{
+    display:flex; justify-content:space-between;
+    font-size:9.5px; margin-top:10px; color:#726d5a;
+    letter-spacing:0.08em;
+  }
+
+  #hint{
+    position:absolute; bottom:26px; right:32px; z-index:5;
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:0.6; text-align:right; line-height:1.7;
+  }
+
+  @media (max-width: 720px){
+    #hud{ width: calc(100% - 64px); }
+    #hint{ display:none; }
+    #label-top{ max-width: 180px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scroll-spacer">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+
+    <div class="corner-label" id="label-top">
+      <div class="title">CNC MACHINING CENTER</div>
+      Scroll-linked explode · Digital Twin<br/>
+      predictive failure diagnostic mode
+    </div>
+
+    <div class="corner-label" id="label-plate">
+      <div class="idx">WS-102</div>
+      <div>REV D · SCALE 1:1</div>
+      <div>SHEET 01 OF 01</div>
+    </div>
+
+    <!-- Side Panel (Alert Card) -->
+    <div id="side-panel">
+      <div class="panel-header">
+        <div class="panel-title">WS-102 STATUS</div>
+        <div class="panel-subtitle">CNC Machining Center</div>
+      </div>
+      <div class="panel-body">
+        <div class="risk-badge">AT RISK</div>
+        <div class="metric-row">
+          <span class="metric-label">Predicted Failure:</span>
+          <span class="metric-val" style="color: var(--risk);">Servo Motor Bearing</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Part Number:</span>
+          <span class="metric-val">BRG-10023</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Failure Probability:</span>
+          <span class="metric-val" style="color: var(--risk);">92%</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Expected Failure:</span>
+          <span class="metric-val">Within 18 hours</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="hud">
+      <div id="hud-header">
+        <span>Timeline scrub</span>
+        <span class="pct" id="hud-pct">00%</span>
+      </div>
+      <div id="hud-track-wrap">
+        <div id="hud-ticks"></div>
+        <div id="hud-track">
+          <div id="hud-fill"></div>
+        </div>
+        <div id="hud-playhead"></div>
+      </div>
+      <div id="hud-footer">
+        <span id="hud-stage">STAGE · ASSEMBLED</span>
+        <span id="hud-frame">FR 000 / 240</span>
+      </div>
+    </div>
+
+    <div id="hint">
+      Scroll — explode assembly<br/>
+      Drag — orbit view<br/>
+      Move cursor — parallax tilt
+    </div>
+  </div>
+</div>
+
+<!-- Libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+
+
+<script>
+(function(){
+  "use strict";
+  gsap.registerPlugin(ScrollTrigger);
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var INK = 0x2A2823;
+  var BEIGE = 0xE7E1D2;
+  var BEIGE_PANEL = 0xEFEADC; 
+  var BEIGE_PANEL_DEEP = 0xDCD5C1; 
+  var RISK_COLOR = 0xFF3B2F;
+  var CYAN_HIGHLIGHT = 0x00E5FF;
+
+  var canvas = document.getElementById('gl');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(BEIGE, 1);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BEIGE, 9, 28);
+
+  var camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 2, 11);
+
+  // ---------- Lighting ----------
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  keyLight.position.set(4, 6, 6);
+  scene.add(keyLight);
+  
+  var fillLight = new THREE.DirectionalLight(0xffffff, 0.25); 
+  fillLight.position.set(-5, -3, -4); 
+  scene.add(fillLight);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+  var riskLight = new THREE.PointLight(RISK_COLOR, 0, 6);
+  scene.add(riskLight);
+
+  // Materials
+  var lineMat = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.85 });
+  var lineMatSoft = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.32 });
+  
+  var bodyMat = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL, roughness: 0.85, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  var bodyMatDeep = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL_DEEP, roughness: 0.9, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+
+  // Glowing risk material for the Servo Motor Bearing
+  var riskMat = new THREE.MeshStandardMaterial({
+    color: 0x3a1010,
+    emissive: RISK_COLOR,
+    emissiveIntensity: 0.8,
+    roughness: 0.3,
+    metalness: 0.6
+  });
+
+  function edged(geometry, material, soft){
+    var mesh = new THREE.Mesh(geometry, material || bodyMat);
+    var edges = new THREE.EdgesGeometry(geometry, soft ? 25 : 12);
+    mesh.add(new THREE.LineSegments(edges, soft ? lineMatSoft : lineMat));
+    return mesh;
+  }
+
+  var assembly = new THREE.Group();
+  scene.add(assembly);
+
+  // ================= CNC MACHINE MODULES =================
+
+  // 1. Machine Bed & Enclosure Base
+  function buildMachineBed(){
+    var g = new THREE.Group();
+    var base = edged(new THREE.BoxGeometry(4, 0.8, 2.5), bodyMatDeep);
+    g.add(base);
+    // Linear Guideways
+    var rail1 = edged(new THREE.BoxGeometry(3.6, 0.1, 0.2), bodyMat, true);
+    rail1.position.set(0, 0.45, 0.8);
+    g.add(rail1);
+    var rail2 = edged(new THREE.BoxGeometry(3.6, 0.1, 0.2), bodyMat, true);
+    rail2.position.set(0, 0.45, -0.8);
+    g.add(rail2);
+    return { group: g, spin: 0 };
+  }
+
+  // 2. Workholding Fixture & Table
+  function buildTable(){
+    var g = new THREE.Group();
+    var table = edged(new THREE.BoxGeometry(2.2, 0.2, 1.4), bodyMat);
+    g.add(table);
+    var fixture = edged(new THREE.BoxGeometry(1.2, 0.3, 0.8), bodyMatDeep, true);
+    fixture.position.y = 0.25;
+    g.add(fixture);
+    return { group: g, spin: 0 };
+  }
+
+  // 3. Spindle & Tool Turret
+  function buildSpindle(){
+    var g = new THREE.Group();
+    var housing = edged(new THREE.BoxGeometry(1.0, 1.8, 1.2), bodyMatDeep);
+    housing.position.y = 0.9;
+    g.add(housing);
+    var spindle = edged(new THREE.CylinderGeometry(0.2, 0.2, 0.6, 32), bodyMat);
+    spindle.position.y = -0.3;
+    g.add(spindle);
+    var tool = edged(new THREE.CylinderGeometry(0.05, 0.01, 0.4, 16), bodyMat, true);
+    tool.position.y = -0.8;
+    g.add(tool);
+    return { group: g, spin: 0 };
+  }
+
+  // 4. Ball Screw & Motor Shaft
+  function buildBallScrew(){
+    var g = new THREE.Group();
+    var screw = edged(new THREE.CylinderGeometry(0.1, 0.1, 3.2, 16), bodyMatDeep, true);
+    screw.rotation.z = Math.PI / 2;
+    g.add(screw);
+    var nut = edged(new THREE.CylinderGeometry(0.25, 0.25, 0.4, 16), bodyMat);
+    nut.rotation.z = Math.PI / 2;
+    nut.position.x = 0.5;
+    g.add(nut);
+    return { group: g, spin: 0.02 };
+  }
+
+  // 5. Servo Motor Bearing (FAILED / RED)
+  function buildServoBearing(){
+    var g = new THREE.Group();
+    var bearing = edged(new THREE.TorusGeometry(0.22, 0.08, 16, 32), riskMat);
+    bearing.rotation.y = Math.PI / 2;
+    g.add(bearing);
+    return { group: g, spin: 0.02, isRisk: true };
+  }
+
+  // 6. Servo Motor
+  function buildServoMotor(){
+    var g = new THREE.Group();
+    var motor = edged(new THREE.BoxGeometry(0.8, 0.8, 0.8), bodyMat);
+    g.add(motor);
+    var connector = edged(new THREE.CylinderGeometry(0.15, 0.15, 0.2, 16), bodyMatDeep);
+    connector.rotation.z = Math.PI / 2;
+    connector.position.x = -0.5;
+    g.add(connector);
+    return { group: g, spin: 0 };
+  }
+
+  // 7. CNC Controller & Panel
+  function buildController(){
+    var g = new THREE.Group();
+    var panel = edged(new THREE.BoxGeometry(0.8, 1.2, 0.1), bodyMat);
+    panel.rotation.y = Math.PI / 6;
+    g.add(panel);
+    var screen = edged(new THREE.BoxGeometry(0.6, 0.6, 0.12), bodyMatDeep, true);
+    screen.rotation.y = Math.PI / 6;
+    screen.position.set(0.01, 0.2, 0.01);
+    g.add(screen);
+    return { group: g, spin: 0 };
+  }
+
+  var modules = [
+    { build: buildMachineBed,   restY: -2.0, explodeY: -3.5, restX: 0,   explodeX: 0 },
+    { build: buildTable,        restY: -1.0, explodeY: -1.5, restX: 0,   explodeX: 0 },
+    { build: buildSpindle,      restY: 0.5,  explodeY: 1.5,  restX: 0,   explodeX: 0 },
+    { build: buildBallScrew,    restY: -1.2, explodeY: -0.2, restX: 0,   explodeX: 0 },
+    { build: buildServoBearing, restY: -1.2, explodeY: -0.2, restX: -1.8, explodeX: -2.5, isRisk: true },
+    { build: buildServoMotor,   restY: -1.2, explodeY: -0.2, restX: -2.4, explodeX: -4.0 },
+    { build: buildController,   restY: 0.0,  explodeY: 1.0,  restX: 2.5,  explodeX: 3.5 }
+  ];
+
+  var built = modules.map(function(m){
+    var res = m.build();
+    res.group.position.set(m.restX, m.restY, 0);
+    assembly.add(res.group);
+    res.restY = m.restY; res.explodeY = m.explodeY;
+    res.restX = m.restX; res.explodeX = m.explodeX;
+    return res;
+  });
+
+  var riskModule = built.find(function(m){ return m.isRisk; });
+
+  // GSAP ScrollTrigger
+  var progress = 0;
+  var scrollTimeline = gsap.timeline({
+    scrollTrigger: {
+      trigger: "#scroll-spacer",
+      start: "top top",
+      end: "bottom bottom",
+      scrub: 0.6,
+      onUpdate: function(self) {
+        progress = self.progress;
+        if (progress > 0.3) {
+          document.getElementById('side-panel').classList.add('open');
+        } else {
+          document.getElementById('side-panel').classList.remove('open');
+        }
+      }
+    }
+  });
+
+  built.forEach(function(m, i){
+    scrollTimeline.to(m.group.position, {
+      y: m.explodeY,
+      x: m.explodeX,
+      ease: "power2.inOut"
+    }, 0);
+  });
+
+  // Pulse risk glow
+  gsap.to(riskMat, {
+    emissiveIntensity: 2.5,
+    duration: 0.8,
+    repeat: -1,
+    yoyo: true,
+    ease: "sine.inOut"
+  });
+
+  gsap.to(riskLight, {
+    intensity: 3.0,
+    duration: 0.8,
+    repeat: -1,
+    yoyo: true,
+    ease: "sine.inOut"
+  });
+
+  // HUD Scrubbing
+  var hudFill = document.getElementById('hud-fill');
+  var hudPlayhead = document.getElementById('hud-playhead');
+  var hudPct = document.getElementById('hud-pct');
+  var hudFrame = document.getElementById('hud-frame');
+  var hudStage = document.getElementById('hud-stage');
+  
+  (function buildTicks(){
+    var wrap = document.getElementById('hud-ticks');
+    for (var i = 0; i <= 20; i++){
+      var s = document.createElement('span');
+      if (i % 5 === 0) s.className = 'major';
+      wrap.appendChild(s);
+    }
+  })();
+
+  function updateHUD(){
+    var pctVal = Math.round(progress * 100);
+    hudFill.style.width = pctVal + '%';
+    hudPlayhead.style.left = pctVal + '%';
+    hudPct.textContent = (pctVal < 10 ? '0' : '') + pctVal + '%';
+    hudFrame.textContent = 'FR ' + String(Math.round(progress * 240)).padStart(3, '0') + ' / 240';
+    var stages = ['ASSEMBLED', 'CASING REMOVED', 'MOTORS EXPOSED', 'BEARING ISOLATED', 'FULL DIAGNOSTIC'];
+    hudStage.textContent = 'STAGE · ' + stages[Math.min(stages.length - 1, Math.floor(progress * stages.length))];
+  }
+
+  // Camera Orbit & Parallax
+  var dragRotation = { x: 0.3, y: -0.4 };
+  var parallax = { x: 0, y: 0 };
+  var dragging = false, lastX = 0, lastY = 0, velocity = { x: 0, y: 0 };
+  
+  canvas.addEventListener('pointerdown', function(e){
+    dragging = true; lastX = e.clientX; lastY = e.clientY; velocity.x = 0; velocity.y = 0;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    var dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    velocity.y = dx * 0.005; velocity.x = dy * 0.005;
+    dragRotation.y += velocity.y;
+    dragRotation.x = Math.max(-0.6, Math.min(1.2, dragRotation.x + velocity.x));
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; });
+  
+  var mouseNorm = { x: 0, y: 0 };
+  window.addEventListener('pointermove', function(e){
+    mouseNorm.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNorm.y = (e.clientY / window.innerHeight) * 2 - 1;
+  });
+
+  function resize(){
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+
+  var clock = new THREE.Clock();
+
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt = clock.getDelta();
+
+    if (riskModule){
+      riskLight.position.copy(riskModule.group.position);
+      riskLight.position.z += 0.5;
+    }
+
+    built.forEach(function(m){
+      if (m.spin) m.group.rotation.x += m.spin * (dt * 60);
+    });
+
+    if (!dragging){
+      velocity.x *= 0.92; velocity.y *= 0.92;
+      dragRotation.y += velocity.y;
+      dragRotation.x = Math.max(-0.6, Math.min(1.2, dragRotation.x + velocity.x));
+    }
+    
+    parallax.x += (mouseNorm.y * 0.1 - parallax.x) * 0.06;
+    parallax.y += (mouseNorm.x * 0.1 - parallax.y) * 0.06;
+
+    assembly.rotation.x = dragRotation.x + parallax.x;
+    assembly.rotation.y = dragRotation.y + parallax.y;
+    camera.lookAt(0, -0.5, 0);
+
+    updateHUD();
+    renderer.render(scene, camera);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>

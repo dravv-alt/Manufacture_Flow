@@ -1,0 +1,49 @@
+// LEGACY EXECUTIVE DASHBOARD V1 — preserved before factual data-driven revision.
+// "use client";
+// 
+// import Link from "next/link";
+// import { useState } from "react";
+// import { ArrowRight, CalendarDays, CircleAlert, Factory, Search, Settings2, Zap } from "lucide-react";
+// import { Badge } from "@/components/ui/badge";
+// import { Button } from "@/components/ui/button";
+// import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// import { cn } from "@/lib/utils";
+// 
+// // demo_data
+// const rows = [
+//   ["WS-102", "CNC", "Warning", "78", "3.1", "45.2", "82", "120", "30", "1.2", "16-Aug"],
+//   ["WS-108", "Robotic Arm", "Critical", "92", "4.2", "12.5", "65", "45", "80", "4.5", "OVERDUE"],
+//   ["WS-112", "Conveyor", "Normal", "45", "0.8", "8.4", "94", "N/A", "500", "0.1", "02-Sep"],
+//   ["WS-114", "Conveyor + Manipulator", "Normal", "46", "1.3", "10.2", "91", "72", "144", "0.5", "20-Aug"],
+// ];
+// 
+// export function ExecutiveDashboard() {
+//   const [selected, setSelected] = useState("WS-102");
+//   const [filter, setFilter] = useState(false);
+// 
+//   return (
+//     <main className="px-5 py-8 md:px-8 lg:px-10">
+//       <div className="mx-auto flex max-w-[1400px] flex-col gap-5">
+//         <section className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+//           <div><p className="font-heading text-3xl font-semibold tracking-[-0.04em]">Hi, Plant Manager!</p><p className="mt-2 text-base text-muted-foreground">Here is the current status of the manufacturing floor.</p></div>
+//           <div className="flex flex-wrap gap-3"><Link href="/dashboard" className="flex h-10 items-center gap-2 rounded-full border border-border bg-card px-4 text-sm text-muted-foreground"><Search className="size-4" />Explore digital twin</Link><Button asChild><Link href="/failure/FC-2024-0047">Open critical case</Link></Button></div>
+//         </section>
+// 
+//         <section className="grid gap-5 xl:grid-cols-[1.35fr_0.95fr]">
+//           <Card className="overflow-hidden"><CardHeader><div className="flex items-start justify-between"><div><CardTitle className="font-heading">Overall plant risk level</CardTitle><CardDescription>Risk concentration across monitored stations</CardDescription></div><Button variant="ghost" size="icon" aria-label="Risk options"><Settings2 /></Button></div></CardHeader><CardContent className="relative min-h-64 overflow-hidden"><div className="absolute left-[34%] top-8 size-24 rounded-full bg-primary/80 blur-[2px]" /><button onClick={() => setSelected("WS-112")} className="absolute left-[42%] top-2 flex size-32 items-center justify-center rounded-full bg-warning text-center font-heading text-sm font-semibold shadow-xl transition-transform hover:scale-105">WS-112<br />Wear</button><button onClick={() => setSelected("WS-102")} className="absolute left-[56%] top-12 flex size-28 items-center justify-center rounded-full bg-destructive text-center font-heading text-sm font-semibold text-primary-foreground shadow-xl transition-transform hover:scale-105">WS-102<br />Critical</button><div className="absolute bottom-4 left-0 flex flex-col gap-2 text-xs"><span className="flex items-center gap-2"><i className="h-0.5 w-5 bg-destructive" />Critical failure imminent</span><span className="flex items-center gap-2"><i className="h-0.5 w-5 bg-warning" />High wear detected</span><span className="flex items-center gap-2"><i className="h-0.5 w-5 bg-primary" />Normal operation</span></div></CardContent></Card>
+//           <Card className="bg-primary text-primary-foreground"><CardHeader><div className="flex items-start justify-between"><div><CardTitle className="font-heading text-primary-foreground">Maintenance schedule</CardTitle><CardDescription className="text-primary-foreground/60">August 2026</CardDescription></div><CalendarDays className="size-5 text-primary-foreground/65" /></div></CardHeader><CardContent className="grid grid-cols-7 gap-2 font-mono text-xs">{["M","T","W","T","F","S","S", "","","","","","1","2", "3","4","5","6","7","8","9", "10","11","12","13","14","15","16", "17","18","19","20","21","22","23"].map((day,index) => <span key={index} className={cn("flex h-8 items-center justify-center rounded-full", day === "2" || day === "16" ? "bg-warning text-primary" : day === "13" ? "bg-destructive" : day === "6" ? "border border-warning" : "")}>{day}</span>)}<div className="col-span-7 mt-3 flex flex-wrap gap-4 border-t border-primary-foreground/15 pt-3 text-[10px] text-primary-foreground/70"><span>â—¦ Scheduled</span><span>â— Maintenance done</span><span>â— Critical</span></div></CardContent></Card>
+//         </section>
+// 
+//         <section className="grid gap-5 lg:grid-cols-3">
+//           <Card><CardHeader><CardTitle className="font-heading">Plant efficiency (OEE)</CardTitle><CardDescription>Keep the line moving</CardDescription></CardHeader><CardContent className="flex min-h-48 flex-col items-center justify-center"><div className="flex size-32 items-center justify-center rounded-full border-[9px] border-success text-center"><span className="font-heading text-3xl font-semibold">87.5%</span></div><p className="mt-4 font-mono text-xs text-muted-foreground">TARGET 95%</p></CardContent></Card>
+//           <Card><CardHeader><div className="flex items-start justify-between"><div><CardTitle className="font-heading">Energy consumption</CardTitle><CardDescription>Daily production quota</CardDescription></div><span className="font-mono text-xl font-semibold">450 <small className="text-xs text-muted-foreground">kWh</small></span></div></CardHeader><CardContent className="flex min-h-48 flex-col justify-center"><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full w-[88%] rounded-full bg-primary" /></div><div className="mt-3 flex justify-between font-mono text-xs text-muted-foreground"><span>0 kWh</span><span>500 kWh</span></div></CardContent></Card>
+//           <Card><CardHeader><div className="flex items-start justify-between"><div><CardTitle className="font-heading">Monitored workstations</CardTitle><CardDescription>{selected} selected</CardDescription></div><CircleAlert className="size-5 text-destructive" /></div></CardHeader><CardContent className="flex flex-col gap-2">{rows.map(([id, type, status]) => <button key={id} onClick={() => setSelected(id)} className={cn("flex items-center justify-between rounded-xl bg-muted px-3 py-3 text-left hover:bg-secondary", selected === id && "ring-1 ring-primary")}><span><span className="block font-mono text-xs font-semibold">{id}</span><span className="block text-xs text-muted-foreground">{type}</span></span><Badge variant={status === "Critical" ? "destructive" : status === "Warning" ? "outline" : "secondary"}>{status}</Badge></button>)}</CardContent></Card>
+//         </section>
+// 
+//         <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-4"><div><CardTitle className="font-heading">Comprehensive workstation health data</CardTitle><CardDescription>Interactive controlled-scenario monitoring table.</CardDescription></div><Button variant="outline" onClick={() => setFilter((value) => !value)}>{filter ? "Show all" : "Filter at-risk"}</Button></div></CardHeader><CardContent className="overflow-x-auto"><table className="w-full min-w-[900px] text-left text-sm"><thead className="border-b border-border font-mono text-[10px] tracking-wide text-muted-foreground"><tr>{["WS ID","TYPE","STATUS","TEMP Â°C","VIB mm/s","POWER kW","OEE %","CYCLE","OUTPUT/h","DEFECT %","NEXT MAINT."].map((label) => <th key={label} className="pb-3 pr-4">{label}</th>)}</tr></thead><tbody>{rows.filter((row) => !filter || row[2] !== "Normal").map((row) => <tr key={row[0]} className="border-b border-border last:border-0">{row.map((value,index) => <td key={index} className={cn("py-4 pr-4", index === 0 && "font-mono font-semibold", value === "Critical" || value === "OVERDUE" ? "font-semibold text-destructive" : value === "Warning" ? "font-semibold text-warning" : "")}>{index === 2 ? <Badge variant={value === "Critical" ? "destructive" : value === "Warning" ? "outline" : "secondary"}>{value}</Badge> : value}</td>)}</tr>)}</tbody></table></CardContent></Card>
+//       </div>
+//     </main>
+//   );
+// }
+// 
+// 

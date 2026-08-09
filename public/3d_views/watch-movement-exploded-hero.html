@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Movement / Exploded Horology Assembly</title>
+<style>
+  :root{
+    --beige: #E9E2D0; --ink: #29271F; --ink-soft: #55503f; --rust: #9C6B3E; --hud-bg: rgba(18,17,12,0.92);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--beige); color:var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-x:hidden; }
+  #scroll-spacer{ height: 420vh; position:relative; }
+  #stage{ position:sticky; top:0; left:0; width:100%; height:100vh; overflow:hidden; }
+  canvas#gl{ display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
+  canvas#gl:active{ cursor:grabbing; }
+  .corner-label{ position:absolute; z-index:5; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--ink-soft); pointer-events:none; line-height:1.6; }
+  #label-top{ top:28px; left:32px; max-width: 280px; }
+  #label-top .title{ font-size:13px; color:var(--ink); font-weight:600; margin-bottom:6px; letter-spacing:0.08em; }
+  #label-plate{ top:28px; right:32px; text-align:right; }
+  #label-plate div{ opacity:0.75; }
+  #label-plate .idx{ color:var(--rust); font-weight:700; opacity:1; }
+  #hud{ position:absolute; bottom:26px; left:32px; z-index:10; width:320px; background:var(--hud-bg);
+    border-radius:10px; padding:14px 16px 12px; color:#D8D3C4; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px); user-select:none; }
+  #hud-header{ display:flex; justify-content:space-between; align-items:baseline; font-size:10px;
+    letter-spacing:0.14em; text-transform:uppercase; color:#8f8a78; margin-bottom:10px; }
+  #hud-header .pct{ color:var(--rust); font-weight:700; }
+  #hud-track-wrap{ position:relative; height:24px; }
+  #hud-ticks{ position:absolute; top:0; left:0; right:0; height:8px; display:flex; justify-content:space-between; }
+  #hud-ticks span{ width:1px; height:6px; background:#4a4636; }
+  #hud-ticks span.major{ height:8px; background:#6b664f; }
+  #hud-track{ position:absolute; top:12px; left:0; right:0; height:2px; background:#3a362a; border-radius:1px; cursor:pointer; }
+  #hud-fill{ position:absolute; top:0; left:0; height:100%; background:var(--rust); border-radius:1px; width:0%; }
+  #hud-playhead{ position:absolute; top:12px; left:0%; width:11px; height:11px; margin-left:-5.5px; margin-top:-4.5px;
+    background:var(--rust); transform:rotate(45deg); border:2px solid #efe9d8; cursor:grab; }
+  #hud-footer{ display:flex; justify-content:space-between; font-size:9.5px; margin-top:10px; color:#726d5a; letter-spacing:0.08em; }
+  #hint{ position:absolute; bottom:26px; right:32px; z-index:5; font-size:10px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--ink-soft); opacity:0.6; text-align:right; line-height:1.7; }
+  @media (max-width: 720px){ #hud{ width: calc(100% - 64px); } #hint{ display:none; } #label-top{ max-width: 180px; } }
+</style>
+</head>
+<body>
+<div id="scroll-spacer">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div class="corner-label" id="label-top">
+      <div class="title">MOVEMENT — MANUAL CALIBER</div>
+      Scroll-linked explode · gear train, barrel<br/>and balance stack, hand-finished bridges
+    </div>
+    <div class="corner-label" id="label-plate">
+      <div class="idx">CAL-882</div>
+      <div>21,600 BPH · 17 JEWELS</div>
+      <div>SHEET 01 OF 01</div>
+    </div>
+    <div id="hud">
+      <div id="hud-header"><span>Timeline scrub</span><span class="pct" id="hud-pct">00%</span></div>
+      <div id="hud-track-wrap">
+        <div id="hud-ticks"></div>
+        <div id="hud-track"><div id="hud-fill"></div></div>
+        <div id="hud-playhead"></div>
+      </div>
+      <div id="hud-footer"><span id="hud-stage">STAGE · CASED</span><span id="hud-frame">FR 000 / 240</span></div>
+    </div>
+    <div id="hint">Scroll — explode assembly<br/>Drag — orbit view<br/>Move cursor — parallax tilt</div>
+
+    <div id="load-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      z-index:20;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;
+      color:#55503f;background:transparent;pointer-events:none;">Loading renderer…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+  onerror="document.getElementById('load-status').innerHTML='Failed to load three.js from cdnjs.cloudflare.com.<br/>Check your network/ad-blocker and reload.'; document.getElementById('load-status').style.color='#9C6B3E';"></script>
+<script>
+(function(){
+  "use strict";
+  var statusEl = document.getElementById('load-status');
+  try {
+  if (typeof THREE === 'undefined') {
+    throw new Error('THREE failed to load — the CDN script did not execute.');
+  }
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var INK = 0x29271F, BEIGE = 0xE9E2D0, BEIGE_PANEL = 0xF0EADA;
+
+  var canvas = document.getElementById('gl');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(BEIGE, 1);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BEIGE, 8, 20);
+  var camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
+
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  keyLight.position.set(4,6,6);
+  scene.add(keyLight);
+  var fill = new THREE.DirectionalLight(0xffffff, 0.25); fill.position.set(-5,-3,-4); scene.add(fill);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+  var lineMat = new THREE.LineBasicMaterial({ color: INK, transparent:true, opacity:0.85 });
+  var lineMatSoft = new THREE.LineBasicMaterial({ color: INK, transparent:true, opacity:0.32 });
+  var bodyMat = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL, roughness:0.85, metalness:0.08,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+  var bodyMatDeep = new THREE.MeshStandardMaterial({ color: 0xDDD4BE, roughness:0.9, metalness:0.08,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+  var goldMat = new THREE.MeshStandardMaterial({ color: 0xE4D6AE, roughness:0.4, metalness:0.5,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+
+  function edged(geometry, material, soft){
+    var mesh = new THREE.Mesh(geometry, material || bodyMat);
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, soft?25:12), soft?lineMatSoft:lineMat));
+    return mesh;
+  }
+
+  var assembly = new THREE.Group();
+  assembly.rotation.z = Math.PI / 2;
+  scene.add(assembly);
+
+  var dragRotation = { x:0, y:0 };
+  var parallax = { x:0, y:0 };
+
+  function jewelRing(count, radius, y){
+    var g = new THREE.Group();
+    for (var i=0;i<count;i++){
+      var a=(i/count)*Math.PI*2;
+      var m=edged(new THREE.CylinderGeometry(0.04,0.04,0.03,12), goldMat, true);
+      m.position.set(Math.cos(a)*radius,y,Math.sin(a)*radius);
+      m.rotation.x=Math.PI/2;
+      g.add(m);
+    }
+    return g;
+  }
+
+  function toothRing(count, radius, y, size, group, mat){
+    for (var i=0;i<count;i++){
+      var a=(i/count)*Math.PI*2;
+      var t=edged(new THREE.BoxGeometry(size[0],size[1],size[2]), mat||bodyMat, true);
+      t.position.set(Math.cos(a)*radius,y,Math.sin(a)*radius);
+      t.rotation.y=-a;
+      group.add(t);
+    }
+  }
+
+  function gearWheel(radius, teeth, y, mat){
+    var g = new THREE.Group();
+    var disc = edged(new THREE.CylinderGeometry(radius,radius,0.05,32), mat||bodyMat, true);
+    g.add(disc);
+    toothRing(teeth, radius+0.03, 0, [0.05,0.06,0.03], g, mat);
+    var spokes = 4;
+    for (var i=0;i<spokes;i++){
+      var a=(i/spokes)*Math.PI*2;
+      var spoke = edged(new THREE.BoxGeometry(radius*1.6,0.04,0.03), mat||bodyMat, true);
+      spoke.position.y = y;
+      spoke.rotation.z = a;
+      g.add(spoke);
+    }
+    g.position.y = y;
+    return g;
+  }
+
+  // ---- 1. Case back / main plate ----
+  function buildMainPlate(){
+    var g = new THREE.Group();
+    var plate = edged(new THREE.CylinderGeometry(1.5,1.5,0.16,48), bodyMat);
+    g.add(plate);
+    g.add(jewelRing(6, 0.9, 0.1));
+    g.add(jewelRing(4, 1.2, 0.1));
+    return { group:g, spin:0.0002 };
+  }
+
+  // ---- 2. Mainspring barrel ----
+  function buildBarrel(){
+    var g = new THREE.Group();
+    var barrel = edged(new THREE.CylinderGeometry(0.55,0.55,0.34,36), bodyMatDeep);
+    g.add(barrel);
+    toothRing(36, 0.58, 0, [0.035,0.06,0.03], g);
+    var arbor = edged(new THREE.CylinderGeometry(0.08,0.08,0.5,16), goldMat, true);
+    g.add(arbor);
+    g.position.x = 0.55; // offset off-axis, characteristic of movements
+    return { group:g, spin:0.0009 };
+  }
+
+  // ---- 3. Gear train bridge (skeletal, with running wheels) ----
+  function buildTrainBridge(){
+    var g = new THREE.Group();
+    var bridgeShape = edged(new THREE.CylinderGeometry(1.15,1.15,0.05,48,1,true), bodyMat, true);
+    g.add(bridgeShape);
+    // cutout struts to look skeletal
+    var strutCount = 5;
+    var struts = [];
+    for (var i=0;i<strutCount;i++){
+      var a=(i/strutCount)*Math.PI*2;
+      var strut = edged(new THREE.BoxGeometry(1.6,0.18,0.05), bodyMat, true);
+      strut.rotation.z = a;
+      g.add(strut);
+      struts.push(strut);
+    }
+    var wheels = [];
+    var positions = [ [0.5,0], [-0.35,0.4], [-0.35,-0.4] ];
+    positions.forEach(function(p, i){
+      var w = gearWheel(0.32 - i*0.03, 24 - i*4, 0, i===0?goldMat:bodyMatDeep);
+      w.position.set(p[0], 0.1, p[1]);
+      g.add(w);
+      wheels.push(w);
+    });
+    return { group:g, spin:0, wheels: wheels };
+  }
+
+  // ---- 4. Balance wheel + hairspring (unique: oscillates, doesn't spin) ----
+  function buildBalance(){
+    var g = new THREE.Group();
+    var cock = edged(new THREE.CylinderGeometry(0.85,0.85,0.04,40,1,true), bodyMat, true);
+    g.add(cock);
+
+    var wheelGroup = new THREE.Group();
+    var rim = edged(new THREE.TorusGeometry(0.55,0.045,8,32), goldMat);
+    rim.rotation.x = Math.PI/2;
+    wheelGroup.add(rim);
+    var spokeCount = 3;
+    for (var i=0;i<spokeCount;i++){
+      var a=(i/spokeCount)*Math.PI*2;
+      var spoke = edged(new THREE.BoxGeometry(1.05,0.03,0.03), goldMat, true);
+      spoke.rotation.y = a;
+      wheelGroup.add(spoke);
+    }
+    var hub = edged(new THREE.CylinderGeometry(0.08,0.08,0.15,16), bodyMatDeep, true);
+    wheelGroup.add(hub);
+    g.add(wheelGroup);
+
+    // hairspring: flat spiral drawn as a line loop
+    var spiralPts = [];
+    var turns = 5.5, pointsPerTurn = 24;
+    for (var t=0; t<=turns*pointsPerTurn; t++){
+      var frac = t/pointsPerTurn;
+      var r = 0.08 + frac*0.065;
+      var ang = frac*Math.PI*2;
+      spiralPts.push(new THREE.Vector3(Math.cos(ang)*r, 0, Math.sin(ang)*r));
+    }
+    var spiralGeo = new THREE.BufferGeometry().setFromPoints(spiralPts);
+    var hairspring = new THREE.Line(spiralGeo, lineMat);
+    hairspring.position.y = 0.03;
+    g.add(hairspring);
+
+    return { group:g, spin:0, oscillate:{ mesh: wheelGroup, amp: 1.7, freq: 5.5 } };
+  }
+
+  // ---- 5. Escapement / pallet fork ----
+  function buildEscapement(){
+    var g = new THREE.Group();
+    var plate = edged(new THREE.CylinderGeometry(0.5,0.5,0.06,32,1,true), bodyMat, true);
+    g.add(plate);
+    var fork = edged(new THREE.BoxGeometry(0.5,0.09,0.09), bodyMatDeep, true);
+    g.add(fork);
+    var escWheel = gearWheel(0.28, 15, 0.02, goldMat);
+    escWheel.position.x = 0.35;
+    g.add(escWheel);
+    return { group:g, spin:0, wheels:[escWheel] };
+  }
+
+  // ---- 6. Winding rotor (dial-side weighted disc) ----
+  function buildRotor(){
+    var g = new THREE.Group();
+    var full = edged(new THREE.CylinderGeometry(1.3,1.3,0.1,48,1,false,0,Math.PI*1.15), bodyMatDeep);
+    g.add(full);
+    var hub = edged(new THREE.CylinderGeometry(0.18,0.18,0.16,20), goldMat, true);
+    g.add(hub);
+    g.add(jewelRing(3, 1.0, 0.06));
+    return { group:g, spin:0.0018 };
+  }
+
+  var modules = [
+    { build: buildMainPlate,  restY:-2.7, explodeY:-5.6 },
+    { build: buildBarrel,     restY:-1.6, explodeY:-3.3 },
+    { build: buildTrainBridge,restY:-0.55, explodeY:-1.1 },
+    { build: buildBalance,    restY: 0.4,  explodeY: 1.0 },
+    { build: buildEscapement, restY: 1.3,  explodeY: 3.0 },
+    { build: buildRotor,      restY: 2.3,  explodeY: 5.2 }
+  ];
+
+  var built = modules.map(function(m){
+    var res = m.build();
+    res.group.position.y = m.restY;
+    assembly.add(res.group);
+    res.restY = m.restY; res.explodeY = m.explodeY;
+    return res;
+  });
+
+  var scrollProgress=0, manualProgress=0, isScrubbing=false, progress=0;
+  function spacerHeight(){ return document.getElementById('scroll-spacer').offsetHeight - window.innerHeight; }
+  function updateScrollProgress(){ var max=spacerHeight(); scrollProgress = max>0 ? Math.min(1,Math.max(0,window.scrollY/max)) : 0; }
+  window.addEventListener('scroll', function(){ if(!isScrubbing) updateScrollProgress(); }, {passive:true});
+
+  var hudFill=document.getElementById('hud-fill'), hudPlayhead=document.getElementById('hud-playhead');
+  var hudPct=document.getElementById('hud-pct'), hudFrame=document.getElementById('hud-frame');
+  var hudStage=document.getElementById('hud-stage'), hudTrack=document.getElementById('hud-track');
+  var hudTicksWrap=document.getElementById('hud-ticks');
+  (function(){ for(var i=0;i<=20;i++){ var s=document.createElement('span'); if(i%5===0)s.className='major'; hudTicksWrap.appendChild(s); } })();
+  function trackRect(){ return hudTrack.getBoundingClientRect(); }
+  function setManualFromClientX(x){ var r=trackRect(); manualProgress=Math.min(1,Math.max(0,(x-r.left)/r.width)); }
+  function scrubStart(e){ isScrubbing=true; setManualFromClientX(e.touches?e.touches[0].clientX:e.clientX);
+    window.addEventListener('pointermove', scrubMove); window.addEventListener('pointerup', scrubEnd); }
+  function scrubMove(e){ if(isScrubbing) setManualFromClientX(e.clientX); }
+  function scrubEnd(){ isScrubbing=false; window.removeEventListener('pointermove', scrubMove); window.removeEventListener('pointerup', scrubEnd); }
+  hudTrack.addEventListener('pointerdown', scrubStart);
+  hudPlayhead.addEventListener('pointerdown', function(e){ e.stopPropagation(); scrubStart(e); });
+
+  var stageNames=['CASED','CASE OPENED','TRAIN LIFTED','BALANCE FREED','FULLY EXPLODED'];
+  function stageLabelFor(p){ return stageNames[Math.min(stageNames.length-1, Math.floor(p*stageNames.length))]; }
+
+  var dragging=false, lastX=0, lastY=0, velocity={x:0,y:0}, DAMPING=0.90, SENSITIVITY=0.006;
+  canvas.addEventListener('pointerdown', function(e){ dragging=true; lastX=e.clientX; lastY=e.clientY; velocity.x=0; velocity.y=0; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', function(e){ if(!dragging) return;
+    var dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    velocity.y=dx*SENSITIVITY; velocity.x=dy*SENSITIVITY;
+    dragRotation.y+=velocity.y; dragRotation.x=Math.max(-0.6,Math.min(0.6,dragRotation.x+velocity.x)); });
+  window.addEventListener('pointerup', function(){ dragging=false; });
+  window.addEventListener('pointercancel', function(){ dragging=false; });
+
+  var mouseNorm={x:0,y:0};
+  window.addEventListener('pointermove', function(e){ mouseNorm.x=(e.clientX/window.innerWidth)*2-1; mouseNorm.y=(e.clientY/window.innerHeight)*2-1; });
+
+  function resize(){ var w=window.innerWidth,h=window.innerHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize); resize(); updateScrollProgress();
+
+  var clock = new THREE.Clock();
+  var idleScale = reducedMotion ? 0 : 1;
+
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    var elapsed = clock.getElapsedTime();
+
+    var target = isScrubbing ? manualProgress : scrollProgress;
+    progress += (target - progress) * 0.12;
+
+    built.forEach(function(m){
+      m.group.position.y = m.restY + (m.explodeY - m.restY) * progress;
+      if (m.spin) m.group.rotation.y += m.spin * (1+idleScale) * (dt*60);
+      if (m.wheels){
+        m.wheels.forEach(function(w, i){ w.rotation.y += (i%2===0?0.03:-0.045) * idleScale * (dt*60); });
+      }
+      if (m.oscillate){
+        var o = m.oscillate;
+        o.mesh.rotation.y = Math.sin(elapsed * o.freq) * (o.amp * Math.PI/180 * 60) * idleScale * 0.02 + Math.sin(elapsed*o.freq)*o.amp*0.35*idleScale;
+      }
+    });
+
+    if (!dragging){
+      velocity.x*=DAMPING; velocity.y*=DAMPING;
+      dragRotation.y+=velocity.y;
+      dragRotation.x=Math.max(-0.6,Math.min(0.6,dragRotation.x+velocity.x));
+    }
+
+    parallax.x += (mouseNorm.y*0.18 - parallax.x)*0.06;
+    parallax.y += (mouseNorm.x*0.22 - parallax.y)*0.06;
+
+    assembly.rotation.x = dragRotation.x + parallax.x;
+    assembly.rotation.y = dragRotation.y + parallax.y;
+
+    var az = -0.5 + progress*1.05, el = 0.34 - progress*0.08, radius = 6.2 + progress*4.4;
+    camera.position.set(Math.sin(az)*radius*Math.cos(el), Math.sin(el)*radius, Math.cos(az)*radius*Math.cos(el));
+    camera.lookAt(0,0,0);
+
+    renderer.render(scene, camera);
+
+    var pctVal = Math.round(progress*100);
+    hudFill.style.width = pctVal+'%';
+    hudPlayhead.style.left = pctVal+'%';
+    hudPct.textContent = (pctVal<10?'0':'')+pctVal+'%';
+    hudFrame.textContent = 'FR ' + String(Math.round(progress*240)).padStart(3,'0') + ' / 240';
+    hudStage.textContent = 'STAGE · ' + stageLabelFor(progress);
+  }
+  statusEl.style.display = 'none';
+  frame();
+
+  } catch (err) {
+    statusEl.style.display = 'flex';
+    statusEl.style.color = '#9C6B3E';
+    statusEl.style.pointerEvents = 'auto';
+    statusEl.style.padding = '24px';
+    statusEl.style.textAlign = 'center';
+    statusEl.innerHTML = 'Render error: ' + (err && err.message ? err.message : err) +
+      '<br/><span style="opacity:0.6;font-size:10px;">Open devtools console for the full stack trace.</span>';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

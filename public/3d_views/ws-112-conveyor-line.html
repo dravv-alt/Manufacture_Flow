@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WS-112 Packaging Conveyor Line — Exploded View</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+<style>
+  :root{
+    --beige: #E7E1D2;
+    --beige-deep: #DAD2BE;
+    --ink: #2A2823;
+    --ink-soft: #55503f;
+    --amber: #FFB300;
+    --hud-bg: rgba(20,18,14,0.92);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--beige);
+    color:var(--ink);
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x:hidden;
+  }
+  #scroll-spacer{ height: 420vh; position:relative; }
+  #stage{
+    position:fixed; top:0; left:0;
+    width:100%; height:100vh; overflow:hidden;
+  }
+  canvas#gl{
+    display:block; width:100%; height:100%;
+    cursor:grab; touch-action:none;
+  }
+  canvas#gl:active{ cursor:grabbing; }
+
+  .corner-label{
+    position:absolute; z-index:5; font-size:11px;
+    letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--ink-soft); pointer-events:none; line-height:1.6;
+  }
+  #label-top{ top:28px; left:32px; max-width: 280px; }
+  #label-top .title{
+    font-size:13px; color:var(--ink); font-weight:600;
+    margin-bottom:6px; letter-spacing:0.08em;
+  }
+  #label-plate{ top:28px; right:32px; text-align:right; }
+  #label-plate div{ opacity:0.75; }
+  #label-plate .idx{ color:var(--amber); font-weight:700; opacity:1; }
+
+  /* Side Panel (Alert Card) */
+  #side-panel {
+    position: absolute; top: 0; right: -420px;
+    width: 380px; height: 100vh;
+    background: rgba(20, 18, 14, 0.95);
+    border-left: 2px solid var(--amber);
+    padding: 32px 24px; color: var(--beige);
+    box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+    z-index: 100;
+    transition: right 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(8px);
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  #side-panel.open { right: 0; }
+  .panel-header { border-bottom: 1px solid #3a342a; padding-bottom: 20px; }
+  .panel-title { font-size: 16px; font-weight: 700; letter-spacing: 0.1em; color: #fff; margin-bottom: 6px; }
+  .panel-subtitle { font-size: 11px; color: var(--ink-soft); text-transform: uppercase; }
+  .panel-body { flex-grow: 1; padding: 30px 0; }
+  
+  .status-badge {
+    background: rgba(255, 179, 0, 0.15);
+    border: 1px solid var(--amber);
+    color: var(--amber);
+    padding: 6px 12px; font-size: 11px; font-weight: bold;
+    display: inline-block; border-radius: 4px; margin-bottom: 24px;
+    letter-spacing: 0.08em;
+  }
+  .metric-row {
+    display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 12px;
+  }
+  .metric-label { color: var(--beige-deep); opacity: 0.8; }
+  .metric-val { font-weight: bold; color: #fff; }
+
+  /* HUD */
+  #hud{
+    position:absolute; bottom:26px; left:32px; z-index:10; width:320px;
+    background:var(--hud-bg); border-radius:10px; padding:14px 16px 12px;
+    color:#D8D3C4; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px); user-select:none;
+  }
+  #hud-header{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:#8f8a78; margin-bottom:10px;
+  }
+  #hud-header .pct{ color:var(--amber); font-weight:700; }
+  #hud-track-wrap{ position:relative; height:24px; }
+  #hud-ticks{ position:absolute; top:0; left:0; right:0; height:8px; display:flex; justify-content:space-between; }
+  #hud-ticks span{ width:1px; height:6px; background:#4a4636; }
+  #hud-ticks span.major{ height:8px; background:#6b664f; }
+  #hud-track{ position:absolute; top:12px; left:0; right:0; height:2px; background:#3a362a; border-radius:1px; }
+  #hud-fill{ position:absolute; top:0; left:0; height:100%; background:var(--amber); width:0%; }
+  #hud-playhead{
+    position:absolute; top:12px; left:0%; width:11px; height:11px;
+    margin-left:-5.5px; margin-top:-4.5px; background:var(--amber);
+    transform:rotate(45deg); border:2px solid #efe9d8;
+  }
+  #hud-footer{ display:flex; justify-content:space-between; font-size:9.5px; margin-top:10px; color:#726d5a; letter-spacing:0.08em; }
+  #hint{
+    position:absolute; bottom:26px; right:32px; z-index:5; font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:0.6; text-align:right; line-height:1.7;
+  }
+</style>
+</head>
+<body>
+
+<div id="scroll-spacer">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+
+    <div class="corner-label" id="label-top">
+      <div class="title">PACKAGING CONVEYOR LINE</div>
+      Scroll-linked explode · Digital Twin<br/>
+      Operational monitoring
+    </div>
+
+    <div class="corner-label" id="label-plate">
+      <div class="idx">WS-112</div>
+      <div>REV A · SCALE 1:1</div>
+      <div>SHEET 01 OF 01</div>
+    </div>
+
+    <div id="side-panel">
+      <div class="panel-header">
+        <div class="panel-title">WS-112 STATUS</div>
+        <div class="panel-subtitle">Packaging Conveyor Line</div>
+      </div>
+      <div class="panel-body">
+        <div class="status-badge">OPERATIONAL</div>
+        <div class="metric-row">
+          <span class="metric-label">Monitored Component:</span>
+          <span class="metric-val" style="color: var(--amber);">Drive Motor Bearing</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Production Route:</span>
+          <span class="metric-val">Updated</span>
+        </div>
+        <div class="metric-row">
+          <span class="metric-label">Shipment Impact:</span>
+          <span class="metric-val">Review Required</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="hud">
+      <div id="hud-header">
+        <span>Timeline scrub</span>
+        <span class="pct" id="hud-pct">00%</span>
+      </div>
+      <div id="hud-track-wrap">
+        <div id="hud-ticks"></div>
+        <div id="hud-track"><div id="hud-fill"></div></div>
+        <div id="hud-playhead"></div>
+      </div>
+      <div id="hud-footer">
+        <span id="hud-stage">STAGE · ASSEMBLED</span>
+        <span id="hud-frame">FR 000 / 240</span>
+      </div>
+    </div>
+
+    <div id="hint">Scroll — explode assembly<br/>Drag — orbit view<br/>Move cursor — parallax tilt</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+
+
+<script>
+(function(){
+  "use strict";
+  gsap.registerPlugin(ScrollTrigger);
+
+  var INK = 0x2A2823;
+  var BEIGE = 0xE7E1D2;
+  var BEIGE_PANEL = 0xEFEADC; 
+  var BEIGE_PANEL_DEEP = 0xDCD5C1;
+
+  var canvas = document.getElementById('gl');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(BEIGE, 1);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BEIGE, 9, 28);
+  var camera = new THREE.PerspectiveCamera(38, window.innerWidth/window.innerHeight, 0.1, 100);
+  camera.position.set(2, 4, 11);
+  camera.lookAt(0,-0.5,0);
+
+  // ---------- Lighting ----------
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  keyLight.position.set(4, 6, 6);
+  scene.add(keyLight);
+  
+  var fillLight = new THREE.DirectionalLight(0xffffff, 0.25); 
+  fillLight.position.set(-5, -3, -4); 
+  scene.add(fillLight);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+  var bodyMat = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL, roughness: 0.85, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  var bodyMatDeep = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL_DEEP, roughness: 0.9, metalness: 0.05, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  var amberMat = new THREE.MeshStandardMaterial({ color: 0x3a2a00, emissive: 0xFFB300, emissiveIntensity: 0.7, roughness: 0.3 });
+  
+  var lineMat = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.85 });
+
+  function edged(geometry, material){
+    var mesh = new THREE.Mesh(geometry, material || bodyMat);
+    var edges = new THREE.EdgesGeometry(geometry, 15);
+    mesh.add(new THREE.LineSegments(edges, lineMat));
+    return mesh;
+  }
+
+  var assembly = new THREE.Group();
+  scene.add(assembly);
+
+  function buildFrame(){
+    var g = new THREE.Group();
+    var frame1 = edged(new THREE.BoxGeometry(6, 0.2, 0.2), bodyMatDeep);
+    frame1.position.z = 0.8;
+    g.add(frame1);
+    var frame2 = edged(new THREE.BoxGeometry(6, 0.2, 0.2), bodyMatDeep);
+    frame2.position.z = -0.8;
+    g.add(frame2);
+    // Legs
+    for(var i=-2; i<=2; i+=4){
+      var leg1 = edged(new THREE.BoxGeometry(0.2, 2, 0.2), bodyMat);
+      leg1.position.set(i, -1, 0.8);
+      g.add(leg1);
+      var leg2 = edged(new THREE.BoxGeometry(0.2, 2, 0.2), bodyMat);
+      leg2.position.set(i, -1, -0.8);
+      g.add(leg2);
+    }
+    return { group: g };
+  }
+  
+  function buildRollers(){
+    var g = new THREE.Group();
+    for(var i=-2.8; i<=2.8; i+=0.4){
+      var roller = edged(new THREE.CylinderGeometry(0.1, 0.1, 1.6, 16), bodyMat);
+      roller.rotation.x = Math.PI/2;
+      roller.position.set(i, 0.2, 0);
+      g.add(roller);
+    }
+    return { group: g };
+  }
+
+  function buildDriveMotor(){
+    var g = new THREE.Group();
+    var motor = edged(new THREE.CylinderGeometry(0.4, 0.4, 0.8, 32), bodyMatDeep);
+    motor.rotation.x = Math.PI/2;
+    motor.position.set(3.2, 0.2, 0);
+    g.add(motor);
+    var gearbox = edged(new THREE.BoxGeometry(0.6, 0.6, 0.4), bodyMat);
+    gearbox.position.set(3.2, 0.2, 0.6);
+    g.add(gearbox);
+    return { group: g };
+  }
+
+  function buildMonitoredBearing(){
+    var g = new THREE.Group();
+    var bearing = edged(new THREE.TorusGeometry(0.3, 0.08, 16, 32), amberMat);
+    bearing.rotation.x = Math.PI/2;
+    bearing.position.set(3.2, 0.2, 0.35); // between motor and gearbox
+    g.add(bearing);
+    return { group: g, isMonitored: true };
+  }
+
+  function buildScanner(){
+    var g = new THREE.Group();
+    var scanner = edged(new THREE.BoxGeometry(0.4, 0.8, 0.4), bodyMatDeep);
+    scanner.position.set(0, 1.2, 1.0);
+    var arm = edged(new THREE.BoxGeometry(0.1, 1.0, 0.1), bodyMat);
+    arm.position.set(0, 0.5, 1.0);
+    g.add(scanner);
+    g.add(arm);
+    return { group: g };
+  }
+
+  var modules = [
+    { build: buildFrame, restY: -1.0, explodeY: -2.0, restX: 0, explodeX: 0, restZ: 0, explodeZ: 0 },
+    { build: buildRollers, restY: 0, explodeY: 0, restX: 0, explodeX: 0, restZ: 0, explodeZ: 0 },
+    { build: buildDriveMotor, restY: 0, explodeY: 0, restX: 0, explodeX: 2.0, restZ: 0, explodeZ: 0 },
+    { build: buildMonitoredBearing, restY: 0, explodeY: 0, restX: 0, explodeX: 1.2, restZ: 0, explodeZ: 0 },
+    { build: buildScanner, restY: 0, explodeY: 1.5, restX: 0, explodeX: 0, restZ: 0, explodeZ: 0 }
+  ];
+
+  var built = modules.map(function(m){
+    var res = m.build();
+    res.group.position.set(m.restX, m.restY, m.restZ);
+    assembly.add(res.group);
+    res.restY = m.restY; res.explodeY = m.explodeY;
+    res.restX = m.restX; res.explodeX = m.explodeX;
+    res.restZ = m.restZ; res.explodeZ = m.explodeZ;
+    return res;
+  });
+
+  var progress = 0;
+  var scrollTimeline = gsap.timeline({
+    scrollTrigger: {
+      trigger: "#scroll-spacer", start: "top top", end: "bottom bottom", scrub: 0.6,
+      onUpdate: function(self) {
+        progress = self.progress;
+        if(progress > 0.3) document.getElementById('side-panel').classList.add('open');
+        else document.getElementById('side-panel').classList.remove('open');
+        updateHUD();
+      }
+    }
+  });
+
+  built.forEach(function(m){
+    scrollTimeline.to(m.group.position, { y: m.explodeY, x: m.explodeX, z: m.explodeZ, ease: "power2.inOut" }, 0);
+  });
+
+  gsap.to(amberMat, { emissiveIntensity: 1.5, duration: 1.5, repeat: -1, yoyo: true, ease: "sine.inOut" });
+
+  var hudFill = document.getElementById('hud-fill'), hudPlayhead = document.getElementById('hud-playhead');
+  var hudPct = document.getElementById('hud-pct'), hudFrame = document.getElementById('hud-frame'), hudStage = document.getElementById('hud-stage');
+  
+  (function buildTicks(){
+    var wrap = document.getElementById('hud-ticks');
+    for (var i = 0; i <= 20; i++){
+      var s = document.createElement('span');
+      if (i % 5 === 0) s.className = 'major';
+      wrap.appendChild(s);
+    }
+  })();
+
+  function updateHUD(){
+    var pctVal = Math.round(progress * 100);
+    hudFill.style.width = pctVal + '%'; hudPlayhead.style.left = pctVal + '%';
+    hudPct.textContent = (pctVal < 10 ? '0' : '') + pctVal + '%';
+    hudFrame.textContent = 'FR ' + String(Math.round(progress * 240)).padStart(3, '0') + ' / 240';
+    var stages = ['ASSEMBLED', 'FRAME SEPARATED', 'MOTOR EXTRACTED', 'BEARING MONITORED', 'FULL DIAGNOSTIC'];
+    hudStage.textContent = 'STAGE · ' + stages[Math.min(stages.length - 1, Math.floor(progress * stages.length))];
+  }
+
+  var dragRotation = { x: 0.2, y: -0.3 }, parallax = { x: 0, y: 0 };
+  var dragging = false, lastX = 0, lastY = 0, velocity = { x: 0, y: 0 }, mouseNorm = { x: 0, y: 0 };
+  
+  canvas.addEventListener('pointerdown', function(e){
+    dragging = true; lastX = e.clientX; lastY = e.clientY; velocity.x = 0; velocity.y = 0;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    velocity.y = (e.clientX - lastX) * 0.005; velocity.x = (e.clientY - lastY) * 0.005;
+    lastX = e.clientX; lastY = e.clientY;
+    dragRotation.y += velocity.y; dragRotation.x += velocity.x;
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; });
+  window.addEventListener('pointermove', function(e){
+    mouseNorm.x = (e.clientX / window.innerWidth) * 2 - 1; mouseNorm.y = (e.clientY / window.innerHeight) * 2 - 1;
+  });
+  window.addEventListener('resize', function(){
+    renderer.setSize(window.innerWidth, window.innerHeight); 
+    camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix();
+  });
+
+  function frame(){
+    requestAnimationFrame(frame);
+    if (!dragging){
+      velocity.x *= 0.92; velocity.y *= 0.92;
+      dragRotation.y += velocity.y; dragRotation.x += velocity.x;
+    }
+    parallax.x += (mouseNorm.y * 0.1 - parallax.x) * 0.06;
+    parallax.y += (mouseNorm.x * 0.1 - parallax.y) * 0.06;
+    assembly.rotation.x = dragRotation.x + parallax.x;
+    assembly.rotation.y = dragRotation.y + parallax.y;
+    camera.lookAt(0, -0.5, 0);
+    renderer.render(scene, camera);
+  }
+  frame();
+})();
+</script>
+</body>
+</html>

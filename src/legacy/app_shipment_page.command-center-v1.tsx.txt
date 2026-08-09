@@ -1,0 +1,6 @@
+// ACTIVE SHIPMENT ROUTE V1 — preserved before the dedicated shipment-impact implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function ShipmentPage() {
+//   return <CommandCenter view="shipment" />;
+// }

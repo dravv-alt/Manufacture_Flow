@@ -1,0 +1,158 @@
+// LEGACY ROUTE — preserved before replacement.
+// "use client";
+// 
+// import React from 'react';
+// 
+// export default function WarehousePage() {
+//   return (
+//     <div className="flex flex-col -mt-10 -mx-10 md:-mx-16">
+//       {/* Top Nav (Desktop) */}
+//       <header className="w-full h-16 bg-transparent flex justify-between items-center mb-8 hidden md:flex pl-8 pr-8 mt-4">
+//         <div className="flex items-center gap-6">
+//           <span className="text-[20px] font-[600] text-primary">Industrial Serenity</span>
+//           <div className="h-6 w-px bg-surface-variant"></div>
+//           <nav className="flex gap-6">
+//             <span className="text-on-surface-variant pb-1 hover:text-primary transition-colors text-sm font-medium">Mumbai Plant</span>
+//             <span className="text-on-surface-variant pb-1 hover:text-primary transition-colors text-sm font-medium">Systems Online</span>
+//           </nav>
+//         </div>
+//         <div className="flex items-center gap-4">
+//           <div className="relative bg-surface-container-low rounded-full px-4 py-2 flex items-center gap-2 shadow-inner w-64">
+//             <span className="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+//             <input className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-on-surface-variant text-on-surface outline-none" placeholder="Search operations..." type="text"/>
+//           </div>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">notifications</span></button>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">settings</span></button>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">help</span></button>
+//         </div>
+//       </header>
+//       
+//       <div className="flex-1 px-4 md:px-8 lg:px-12 pb-12">
+//         <div className="max-w-7xl mx-auto space-y-8">
+//           {/* Context Header Card */}
+//           <section className="bg-surface-container-lowest rounded-2xl border border-surface-variant p-6 shadow-sm">
+//             <div className="mb-4 flex items-center justify-between">
+//               <h2 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">SPARE PART VERIFICATION</h2>
+//               <span className="text-xs text-on-surface-variant flex items-center gap-1"><span className="material-symbols-outlined text-[16px]">schedule</span> Just now</span>
+//             </div>
+//             <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+//               <div>
+//                 <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Failure Case</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">FC-2024-0047</p>
+//               </div>
+//               <div>
+//                 <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Workstation</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">WS-102</p>
+//               </div>
+//               <div>
+//                 <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Predicted Component</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">Servo Motor Bearing</p>
+//               </div>
+//               <div>
+//                 <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Required Part</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">BRG-10023</p>
+//               </div>
+//               <div>
+//                 <p className="text-[11px] text-on-surface-variant uppercase tracking-wider mb-1">Qty Required</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">1</p>
+//               </div>
+//             </div>
+//           </section>
+//           
+//           {/* State Cards */}
+//           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+//             {/* Left Card: SPARE AVAILABLE */}
+//             <div className="bg-surface-container-lowest rounded-2xl border border-surface-variant border-l-[3px] border-l-[#10b981] p-8 flex flex-col h-full shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
+//               <div className="flex items-center gap-3 mb-6">
+//                 <span className="material-symbols-outlined text-[#10b981] text-[24px]">check_circle</span>
+//                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-primary">SPARE AVAILABLE</h3>
+//               </div>
+//               <div className="space-y-4 flex-grow">
+//                 <div className="grid grid-cols-2 gap-4 text-sm border-b border-surface-variant pb-4">
+//                   <div><span className="text-on-surface-variant">Part Number:</span> <span className="font-mono text-[13px] ml-1">BRG-10023</span></div>
+//                   <div><span className="text-on-surface-variant">Part Name:</span> <span className="ml-1 font-medium">Servo Motor Bearing</span></div>
+//                   <div className="col-span-2"><span className="text-on-surface-variant">Warehouse:</span> <span className="ml-1">Mumbai Plant Warehouse</span></div>
+//                 </div>
+//                 <div className="grid grid-cols-3 gap-4 text-sm pb-4">
+//                   <div><span className="text-on-surface-variant">Stock:</span> <span className="font-mono text-[13px] ml-1">3 units</span></div>
+//                   <div><span className="text-on-surface-variant">Reserved:</span> <span className="font-mono text-[13px] ml-1">0</span></div>
+//                   <div><span className="text-on-surface-variant">Available:</span> <span className="font-mono text-[13px] ml-1 font-bold">3</span></div>
+//                 </div>
+//                 
+//                 {/* Nested Reservation Card */}
+//                 <div className="bg-[#f1f1f1] rounded-xl p-5 border border-surface-variant mt-4">
+//                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant mb-3 flex items-center justify-between">
+//                     RESERVATION 
+//                     <span className="px-2 py-0.5 rounded-full bg-[#dcfce7] text-[#166534] text-[10px] font-bold tracking-normal border border-[#bbf7d0]">CONFIRMED</span>
+//                   </h4>
+//                   <div className="grid grid-cols-2 gap-3 text-sm">
+//                     <div><span className="text-on-surface-variant text-xs">Quantity Reserved:</span> <p className="font-mono text-[13px] mt-0.5 font-medium">1 unit</p></div>
+//                     <div><span className="text-on-surface-variant text-xs">Reserved For:</span> <p className="font-mono text-[13px] mt-0.5 font-medium">FC-2024-0047</p></div>
+//                     <div className="col-span-2"><span className="text-on-surface-variant text-xs">Reserved At:</span> <p className="font-mono text-[13px] mt-0.5">06-Aug 03:16 IST</p></div>
+//                   </div>
+//                 </div>
+//               </div>
+//               
+//               <div className="mt-8 space-y-2 pt-4 border-t border-surface-variant">
+//                 <p className="text-xs font-medium text-[#166534] flex items-center gap-2">
+//                   <span className="material-symbols-outlined text-[14px]">arrow_right_alt</span> 
+//                   Part availability passed to Recovery Estimator
+//                 </p>
+//                 <p className="text-xs font-medium text-[#166534] flex items-center gap-2">
+//                   <span className="material-symbols-outlined text-[14px]">arrow_right_alt</span> 
+//                   Maintenance and Warehouse teams notified
+//                 </p>
+//               </div>
+//             </div>
+//             
+//             {/* Right Card: SPARE UNAVAILABLE */}
+//             <div className="bg-surface-container-lowest rounded-2xl border border-surface-variant border-l-[3px] border-l-[#ba1a1a] p-8 flex flex-col h-full shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow opacity-50 grayscale hover:grayscale-0 hover:opacity-100 duration-300">
+//               <div className="flex items-center gap-3 mb-6">
+//                 <span className="material-symbols-outlined text-[#ba1a1a] text-[24px]">error</span>
+//                 <h3 className="text-[11px] font-bold uppercase tracking-widest text-primary">SPARE UNAVAILABLE Ã¢â‚¬â€ PROCUREMENT REQUIRED</h3>
+//               </div>
+//               <div className="space-y-4 flex-grow">
+//                 <div className="grid grid-cols-2 gap-4 text-sm border-b border-surface-variant pb-4">
+//                   <div><span className="text-on-surface-variant">Part Number:</span> <span className="font-mono text-[13px] ml-1">BRG-10023</span></div>
+//                   <div><span className="text-on-surface-variant">Part Name:</span> <span className="ml-1 font-medium">Servo Motor Bearing</span></div>
+//                   <div className="col-span-2 flex justify-between items-center">
+//                     <div><span className="text-on-surface-variant">Warehouse:</span> <span className="ml-1">Mumbai Plant Warehouse</span></div>
+//                     <span className="px-2 py-0.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] text-[10px] font-bold tracking-normal border border-[#fecaca]">INVENTORY ZERO</span>
+//                   </div>
+//                 </div>
+//                 <div className="text-sm pb-4">
+//                   <div><span className="text-on-surface-variant">Stock:</span> <span className="font-mono text-[13px] ml-1 text-[#ba1a1a] font-bold">0 units</span></div>
+//                 </div>
+//                 <div className="mt-4 p-4 bg-surface rounded-lg border border-surface-variant">
+//                   <p className="text-sm font-bold text-primary flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[18px]">pending_actions</span>
+//                     Failure case marked: WAITING FOR PROCUREMENT
+//                   </p>
+//                 </div>
+//               </div>
+//               
+//               <div className="mt-8 space-y-2 pt-4 border-t border-surface-variant mb-6">
+//                 <p className="text-xs font-medium text-[#991b1b] flex items-center gap-2">
+//                   <span className="material-symbols-outlined text-[14px]">arrow_right_alt</span> 
+//                   Procurement request triggered automatically
+//                 </p>
+//                 <p className="text-xs font-medium text-[#991b1b] flex items-center gap-2">
+//                   <span className="material-symbols-outlined text-[14px]">arrow_right_alt</span> 
+//                   Shortage passed to Recovery Estimator
+//                 </p>
+//               </div>
+//               <button className="w-full mt-auto bg-primary text-on-primary rounded-full py-3 px-6 text-sm font-semibold hover:bg-tertiary-container transition-colors flex items-center justify-center gap-2">
+//                 Go to Procurement Request 
+//                 <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+//               </button>
+//             </div>
+//             
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+// 
+// 
+// 

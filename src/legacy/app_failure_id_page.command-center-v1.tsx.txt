@@ -1,0 +1,6 @@
+// ACTIVE FAILURE ROUTE V1 — preserved before the distinct Failure Control implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function FailureCasePage() {
+//   return <CommandCenter view="failure" />;
+// }

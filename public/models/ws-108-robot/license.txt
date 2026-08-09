@@ -1,0 +1,11 @@
+Model Information:
+* title:	6 Axis Industrial Robot Arm
+* source:	https://sketchfab.com/3d-models/6-axis-industrial-robot-arm-3ecc74c22c584b2b8295f17dedcdb89f
+* author:	Jayson Stauffer (https://sketchfab.com/JaysonStauffer)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "6 Axis Industrial Robot Arm" (https://sketchfab.com/3d-models/6-axis-industrial-robot-arm-3ecc74c22c584b2b8295f17dedcdb89f) by Jayson Stauffer (https://sketchfab.com/JaysonStauffer) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

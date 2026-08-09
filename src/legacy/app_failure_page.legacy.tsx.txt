@@ -1,0 +1,10 @@
+// LEGACY ROUTE — preserved before replacement.
+// import { redirect } from 'next/navigation';
+// 
+// // demo_data
+// export default function FailureIndexPage() {
+//   // Redirect to the mock failure case since this is a POC
+//   redirect('/failure/FC-2024-0047');
+// }
+// 
+// 

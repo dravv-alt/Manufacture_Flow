@@ -1,0 +1,6 @@
+// ACTIVE RE-ROUTING ROUTE V1 — preserved before the dedicated re-routing implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function ReroutingPage() {
+//   return <CommandCenter view="rerouting" />;
+// }

@@ -1,0 +1,6 @@
+// ACTIVE WAREHOUSE ROUTE V1 — preserved before the dedicated inventory implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function WarehousePage() {
+//   return <CommandCenter view="warehouse" />;
+// }

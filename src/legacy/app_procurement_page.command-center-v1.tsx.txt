@@ -1,0 +1,6 @@
+// ACTIVE PROCUREMENT ROUTE V1 — preserved before the dedicated procurement implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function ProcurementPage() {
+//   return <CommandCenter view="procurement" />;
+// }

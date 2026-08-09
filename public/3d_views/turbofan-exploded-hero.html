@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Turbofan / Exploded Powerplant Assembly</title>
+<style>
+  :root{
+    --beige: #E6DFCE; --ink: #262420; --ink-soft: #545040; --rust: #C1502E; --hud-bg: rgba(18,16,12,0.93);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--beige); color:var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-x:hidden; }
+  #scroll-spacer{ height: 460vh; position:relative; }
+  #stage{ position:sticky; top:0; left:0; width:100%; height:100vh; overflow:hidden; }
+  canvas#gl{ display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
+  canvas#gl:active{ cursor:grabbing; }
+  .corner-label{ position:absolute; z-index:5; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--ink-soft); pointer-events:none; line-height:1.6; }
+  #label-top{ top:28px; left:32px; max-width: 300px; }
+  #label-top .title{ font-size:13px; color:var(--ink); font-weight:600; margin-bottom:6px; letter-spacing:0.08em; }
+  #label-plate{ top:28px; right:32px; text-align:right; }
+  #label-plate div{ opacity:0.75; }
+  #label-plate .idx{ color:var(--rust); font-weight:700; opacity:1; }
+  #hud{ position:absolute; bottom:26px; left:32px; z-index:10; width:320px; background:var(--hud-bg);
+    border-radius:10px; padding:14px 16px 12px; color:#D8D3C4; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px); user-select:none; }
+  #hud-header{ display:flex; justify-content:space-between; align-items:baseline; font-size:10px;
+    letter-spacing:0.14em; text-transform:uppercase; color:#8f8a78; margin-bottom:10px; }
+  #hud-header .pct{ color:var(--rust); font-weight:700; }
+  #hud-track-wrap{ position:relative; height:24px; }
+  #hud-ticks{ position:absolute; top:0; left:0; right:0; height:8px; display:flex; justify-content:space-between; }
+  #hud-ticks span{ width:1px; height:6px; background:#4a4636; }
+  #hud-ticks span.major{ height:8px; background:#6b664f; }
+  #hud-track{ position:absolute; top:12px; left:0; right:0; height:2px; background:#3a362a; border-radius:1px; cursor:pointer; }
+  #hud-fill{ position:absolute; top:0; left:0; height:100%; background:var(--rust); border-radius:1px; width:0%; }
+  #hud-playhead{ position:absolute; top:12px; left:0%; width:11px; height:11px; margin-left:-5.5px; margin-top:-4.5px;
+    background:var(--rust); transform:rotate(45deg); border:2px solid #efe9d8; cursor:grab; }
+  #hud-footer{ display:flex; justify-content:space-between; font-size:9.5px; margin-top:10px; color:#726d5a; letter-spacing:0.08em; }
+  #hint{ position:absolute; bottom:26px; right:32px; z-index:5; font-size:10px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--ink-soft); opacity:0.6; text-align:right; line-height:1.7; }
+  @media (max-width: 720px){ #hud{ width: calc(100% - 64px); } #hint{ display:none; } #label-top{ max-width: 190px; } }
+</style>
+</head>
+<body>
+<div id="scroll-spacer">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div class="corner-label" id="label-top">
+      <div class="title">POWERPLANT — TWIN-SPOOL TURBOFAN</div>
+      Scroll-linked explode · fan, compressor, combustor,<br/>turbine and nozzle stages, counter-rotating spools
+    </div>
+    <div class="corner-label" id="label-plate">
+      <div class="idx">PWR-229</div>
+      <div>BYPASS 5.6:1 · REV B</div>
+      <div>SHEET 01 OF 01</div>
+    </div>
+    <div id="hud">
+      <div id="hud-header"><span>Timeline scrub</span><span class="pct" id="hud-pct">00%</span></div>
+      <div id="hud-track-wrap">
+        <div id="hud-ticks"></div>
+        <div id="hud-track"><div id="hud-fill"></div></div>
+        <div id="hud-playhead"></div>
+      </div>
+      <div id="hud-footer"><span id="hud-stage">STAGE · NACELLE CLOSED</span><span id="hud-frame">FR 000 / 260</span></div>
+    </div>
+    <div id="hint">Scroll — explode assembly<br/>Drag — orbit view<br/>Move cursor — parallax tilt</div>
+
+    <div id="load-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      z-index:20;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;
+      color:#545040;background:transparent;pointer-events:none;">Loading renderer…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+  onerror="document.getElementById('load-status').innerHTML='Failed to load three.js from cdnjs.cloudflare.com.<br/>Check your network/ad-blocker and reload.'; document.getElementById('load-status').style.color='#C1502E';"></script>
+<script>
+(function(){
+  "use strict";
+  var statusEl = document.getElementById('load-status');
+  try {
+  if (typeof THREE === 'undefined') {
+    throw new Error('THREE failed to load — the CDN script did not execute.');
+  }
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var INK = 0x262420, BEIGE = 0xE6DFCE, BEIGE_PANEL = 0xEEE7D6;
+
+  var canvas = document.getElementById('gl');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(BEIGE, 1);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BEIGE, 10, 26);
+  var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 120);
+
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  keyLight.position.set(5,7,7);
+  scene.add(keyLight);
+  var fill = new THREE.DirectionalLight(0xffffff, 0.25); fill.position.set(-6,-3,-5); scene.add(fill);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+  var lineMat = new THREE.LineBasicMaterial({ color: INK, transparent:true, opacity:0.85 });
+  var lineMatSoft = new THREE.LineBasicMaterial({ color: INK, transparent:true, opacity:0.3 });
+  var bodyMat = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL, roughness:0.85, metalness:0.08,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+  var bodyMatDeep = new THREE.MeshStandardMaterial({ color: 0xDCD3BC, roughness:0.9, metalness:0.08,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+
+  function edged(geometry, material, soft){
+    var mesh = new THREE.Mesh(geometry, material || bodyMat);
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, soft?25:12), soft?lineMatSoft:lineMat));
+    return mesh;
+  }
+
+  var assembly = new THREE.Group();
+  assembly.rotation.z = Math.PI / 2;
+  scene.add(assembly);
+
+  var dragRotation = { x:0, y:0 };
+  var parallax = { x:0, y:0 };
+
+  function boltRing(count, radius, boltR, boltH, y){
+    var g = new THREE.Group();
+    for (var i=0;i<count;i++){
+      var a=(i/count)*Math.PI*2;
+      var m=edged(new THREE.CylinderGeometry(boltR,boltR,boltH,6), bodyMatDeep, true);
+      m.position.set(Math.cos(a)*radius,y,Math.sin(a)*radius);
+      m.rotation.x=Math.PI/2;
+      g.add(m);
+    }
+    return g;
+  }
+
+  function bladeRing(count, hubRadius, tipRadius, chord, twist, mat){
+    var g = new THREE.Group();
+    for (var i=0;i<count;i++){
+      var a = (i/count)*Math.PI*2;
+      var bladeGeo = new THREE.BoxGeometry(chord, tipRadius-hubRadius, 0.03);
+      bladeGeo.translate(0, (tipRadius-hubRadius)/2 + hubRadius, 0); // extend from hub before edges are computed
+      var blade = edged(bladeGeo, mat||bodyMat, true);
+      blade.rotation.x = Math.PI/2;
+      blade.rotation.y = a;
+      blade.rotation.z = twist;
+      g.add(blade);
+    }
+    return g;
+  }
+
+  function ventHoles(count, radius, y, ringGroup){
+    for (var i=0;i<count;i++){
+      var a=(i/count)*Math.PI*2;
+      var hole = edged(new THREE.CylinderGeometry(0.045,0.045,0.04,10), bodyMatDeep, true);
+      hole.position.set(Math.cos(a)*radius,y,Math.sin(a)*radius);
+      hole.rotation.x = Math.PI/2;
+      ringGroup.add(hole);
+    }
+  }
+
+  // ---- 1. Inlet cone / fan hub with fan blades ----
+  function buildFan(){
+    var g = new THREE.Group();
+    var spinner = edged(new THREE.ConeGeometry(0.62,1.0,32), bodyMat);
+    spinner.rotation.x = Math.PI; // point forward (negative axis)
+    spinner.position.y = -0.45;
+    g.add(spinner);
+    var hub = edged(new THREE.CylinderGeometry(0.62,0.62,0.35,32), bodyMatDeep);
+    g.add(hub);
+    var blades = bladeRing(22, 0.62, 1.55, 0.22, 0.35, bodyMat);
+    g.add(blades);
+    return { group:g, spin:0.006, bladeGroup:blades };
+  }
+
+  // ---- 2. Low-pressure compressor stage ----
+  function buildCompressor(){
+    var g = new THREE.Group();
+    var casing = edged(new THREE.CylinderGeometry(1.35,1.32,0.55,40,1,true), bodyMat, true);
+    g.add(casing);
+    var stage1 = bladeRing(26, 0.5, 1.2, 0.14, 0.2, bodyMatDeep);
+    stage1.position.y = -0.14;
+    g.add(stage1);
+    var stage2 = bladeRing(30, 0.5, 1.1, 0.12, -0.2, bodyMatDeep);
+    stage2.position.y = 0.14;
+    g.add(stage2);
+    g.add(boltRing(16, 1.3, 0.035, 0.04, 0.27));
+    return { group:g, spin:0.0046, bladeGroup:stage1, bladeGroup2:stage2 };
+  }
+
+  // ---- 3. Combustor casing ----
+  function buildCombustor(){
+    var g = new THREE.Group();
+    var drum = edged(new THREE.CylinderGeometry(1.15,1.15,0.9,36), bodyMat);
+    g.add(drum);
+    ventHoles(24, 1.17, 0.3, g);
+    ventHoles(24, 1.17, 0.0, g);
+    ventHoles(24, 1.17, -0.3, g);
+    g.add(boltRing(18, 1.2, 0.04, 0.045, 0.44));
+    g.add(boltRing(18, 1.2, 0.04, 0.045, -0.44));
+    return { group:g, spin:0.0004 };
+  }
+
+  // ---- 4. Turbine stage ----
+  function buildTurbine(){
+    var g = new THREE.Group();
+    var casing = edged(new THREE.CylinderGeometry(1.05,1.1,0.5,36,1,true), bodyMatDeep, true);
+    g.add(casing);
+    var stage1 = bladeRing(28, 0.45, 0.98, 0.13, 0.25, bodyMat);
+    stage1.position.y = -0.12;
+    g.add(stage1);
+    var stage2 = bladeRing(24, 0.45, 0.92, 0.12, -0.25, bodyMat);
+    stage2.position.y = 0.12;
+    g.add(stage2);
+    return { group:g, spin:-0.0075, bladeGroup:stage1, bladeGroup2:stage2 };
+  }
+
+  // ---- 5. Central drive shaft (thin, spans full length once exploded) ----
+  function buildShaft(){
+    var g = new THREE.Group();
+    var shaft = edged(new THREE.CylinderGeometry(0.16,0.16,7.6,20), bodyMatDeep, true);
+    g.add(shaft);
+    return { group:g, spin:0.008 };
+  }
+
+  // ---- 6. Exhaust nozzle cone ----
+  function buildNozzle(){
+    var g = new THREE.Group();
+    var nozzle = edged(new THREE.CylinderGeometry(1.0,0.55,1.2,36,1,true), bodyMat, true);
+    g.add(nozzle);
+    var tail = edged(new THREE.ConeGeometry(0.28,0.7,24), bodyMatDeep);
+    tail.position.y = 0.8;
+    g.add(tail);
+    g.add(boltRing(16, 0.98, 0.035, 0.04, -0.55));
+    return { group:g, spin:0.0006 };
+  }
+
+  var modules = [
+    { build: buildFan,        restY:-3.4, explodeY:-7.6, hasShaft:false },
+    { build: buildCompressor, restY:-2.0, explodeY:-4.3 },
+    { build: buildCombustor,  restY:-0.9, explodeY:-1.4 },
+    { build: buildTurbine,    restY: 0.15, explodeY: 1.9 },
+    { build: buildShaft,      restY: 0.0,  explodeY: 0.0, isShaft:true },
+    { build: buildNozzle,     restY: 1.0,  explodeY: 4.6 }
+  ];
+
+  var built = modules.map(function(m){
+    var res = m.build();
+    res.group.position.y = m.restY;
+    assembly.add(res.group);
+    res.restY = m.restY; res.explodeY = m.explodeY; res.isShaft = m.isShaft;
+    return res;
+  });
+
+  var scrollProgress=0, manualProgress=0, isScrubbing=false, progress=0;
+  function spacerHeight(){ return document.getElementById('scroll-spacer').offsetHeight - window.innerHeight; }
+  function updateScrollProgress(){ var max=spacerHeight(); scrollProgress = max>0 ? Math.min(1,Math.max(0,window.scrollY/max)) : 0; }
+  window.addEventListener('scroll', function(){ if(!isScrubbing) updateScrollProgress(); }, {passive:true});
+
+  var hudFill=document.getElementById('hud-fill'), hudPlayhead=document.getElementById('hud-playhead');
+  var hudPct=document.getElementById('hud-pct'), hudFrame=document.getElementById('hud-frame');
+  var hudStage=document.getElementById('hud-stage'), hudTrack=document.getElementById('hud-track');
+  var hudTicksWrap=document.getElementById('hud-ticks');
+  (function(){ for(var i=0;i<=20;i++){ var s=document.createElement('span'); if(i%5===0)s.className='major'; hudTicksWrap.appendChild(s); } })();
+  function trackRect(){ return hudTrack.getBoundingClientRect(); }
+  function setManualFromClientX(x){ var r=trackRect(); manualProgress=Math.min(1,Math.max(0,(x-r.left)/r.width)); }
+  function scrubStart(e){ isScrubbing=true; setManualFromClientX(e.touches?e.touches[0].clientX:e.clientX);
+    window.addEventListener('pointermove', scrubMove); window.addEventListener('pointerup', scrubEnd); }
+  function scrubMove(e){ if(isScrubbing) setManualFromClientX(e.clientX); }
+  function scrubEnd(){ isScrubbing=false; window.removeEventListener('pointermove', scrubMove); window.removeEventListener('pointerup', scrubEnd); }
+  hudTrack.addEventListener('pointerdown', scrubStart);
+  hudPlayhead.addEventListener('pointerdown', function(e){ e.stopPropagation(); scrubStart(e); });
+
+  var stageNames=['NACELLE CLOSED','SPOOL SEPARATION','CORE EXPOSED','SHAFT VISIBLE','FULLY EXPLODED'];
+  function stageLabelFor(p){ return stageNames[Math.min(stageNames.length-1, Math.floor(p*stageNames.length))]; }
+
+  var dragging=false, lastX=0, lastY=0, velocity={x:0,y:0}, DAMPING=0.90, SENSITIVITY=0.006;
+  canvas.addEventListener('pointerdown', function(e){ dragging=true; lastX=e.clientX; lastY=e.clientY; velocity.x=0; velocity.y=0; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', function(e){ if(!dragging) return;
+    var dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    velocity.y=dx*SENSITIVITY; velocity.x=dy*SENSITIVITY;
+    dragRotation.y+=velocity.y; dragRotation.x=Math.max(-0.6,Math.min(0.6,dragRotation.x+velocity.x)); });
+  window.addEventListener('pointerup', function(){ dragging=false; });
+  window.addEventListener('pointercancel', function(){ dragging=false; });
+
+  var mouseNorm={x:0,y:0};
+  window.addEventListener('pointermove', function(e){ mouseNorm.x=(e.clientX/window.innerWidth)*2-1; mouseNorm.y=(e.clientY/window.innerHeight)*2-1; });
+
+  function resize(){ var w=window.innerWidth,h=window.innerHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize); resize(); updateScrollProgress();
+
+  var clock = new THREE.Clock();
+  var idleScale = reducedMotion ? 0 : 1;
+
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt = Math.min(clock.getDelta(), 0.05);
+
+    var target = isScrubbing ? manualProgress : scrollProgress;
+    progress += (target - progress) * 0.1;
+
+    built.forEach(function(m){
+      if (!m.isShaft){
+        m.group.position.y = m.restY + (m.explodeY - m.restY) * progress;
+      } else {
+        // shaft scales to span the exploded gap, stays centered
+        var span = Math.abs((built[5].explodeY) - (built[0].explodeY));
+        var restSpan = Math.abs(built[5].restY - built[0].restY);
+        var s = (restSpan + (span - restSpan) * progress) / 7.6;
+        m.group.scale.y = Math.max(0.001, s);
+      }
+      if (m.spin) m.group.rotation.y += m.spin * (1+idleScale) * (dt*60);
+      if (m.bladeGroup) m.bladeGroup.rotation.y += (m.spin||0.003) * 0.6 * idleScale * (dt*60);
+      if (m.bladeGroup2) m.bladeGroup2.rotation.y -= (m.spin||0.003) * 0.6 * idleScale * (dt*60);
+    });
+
+    if (!dragging){
+      velocity.x*=DAMPING; velocity.y*=DAMPING;
+      dragRotation.y+=velocity.y;
+      dragRotation.x=Math.max(-0.6,Math.min(0.6,dragRotation.x+velocity.x));
+    }
+
+    parallax.x += (mouseNorm.y*0.16 - parallax.x)*0.06;
+    parallax.y += (mouseNorm.x*0.2 - parallax.y)*0.06;
+
+    assembly.rotation.x = dragRotation.x + parallax.x;
+    assembly.rotation.y = dragRotation.y + parallax.y;
+
+    var az = -0.6 + progress*1.2, el = 0.28 - progress*0.05, radius = 8.5 + progress*6.5;
+    camera.position.set(Math.sin(az)*radius*Math.cos(el), Math.sin(el)*radius, Math.cos(az)*radius*Math.cos(el));
+    camera.lookAt(0,0,0);
+
+    renderer.render(scene, camera);
+
+    var pctVal = Math.round(progress*100);
+    hudFill.style.width = pctVal+'%';
+    hudPlayhead.style.left = pctVal+'%';
+    hudPct.textContent = (pctVal<10?'0':'')+pctVal+'%';
+    hudFrame.textContent = 'FR ' + String(Math.round(progress*260)).padStart(3,'0') + ' / 260';
+    hudStage.textContent = 'STAGE · ' + stageLabelFor(progress);
+  }
+  statusEl.style.display = 'none';
+  frame();
+
+  } catch (err) {
+    statusEl.style.display = 'flex';
+    statusEl.style.color = '#C1502E';
+    statusEl.style.pointerEvents = 'auto';
+    statusEl.style.padding = '24px';
+    statusEl.style.textAlign = 'center';
+    statusEl.innerHTML = 'Render error: ' + (err && err.message ? err.message : err) +
+      '<br/><span style="opacity:0.6;font-size:10px;">Open devtools console for the full stack trace.</span>';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

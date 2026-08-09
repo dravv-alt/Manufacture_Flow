@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Assembly / Blueprint Hero</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+<style>
+  :root{
+    --beige: #E7E1D2;
+    --beige-deep: #DAD2BE;
+    --ink: #2A2823;
+    --ink-soft: #55503f;
+    --rust: #B5651D;
+    --hud-bg: rgba(20,18,14,0.92);
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    background:var(--beige);
+    color:var(--ink);
+    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x:hidden;
+  }
+  #scroll-spacer{
+    height: 100vh;
+    position:relative;
+  }
+  #stage{
+    position:sticky;
+    top:0; left:0;
+    width:100%; height:100vh;
+    overflow:hidden;
+  }
+  canvas#gl{
+    display:block;
+    width:100%; height:100%;
+    cursor:grab;
+    touch-action:none;
+  }
+  canvas#gl:active{ cursor:grabbing; }
+
+  .corner-label{
+    position:absolute;
+    z-index:5;
+    font-size:11px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    pointer-events:none;
+    line-height:1.6;
+  }
+  #label-top{
+    top:28px; left:32px;
+    max-width: 280px;
+  }
+  #label-top .title{
+    font-size:13px;
+    color:var(--ink);
+    font-weight:600;
+    margin-bottom:6px;
+    letter-spacing:0.08em;
+  }
+  #label-plate{
+    top:28px; right:32px;
+    text-align:right;
+  }
+  #label-plate div{ opacity:0.75; }
+  #label-plate .idx{ color:var(--rust); font-weight:700; opacity:1; }
+
+  #hud{
+    position:absolute;
+    bottom:26px; left:32px;
+    z-index:10;
+    width:320px;
+    background:var(--hud-bg);
+    border-radius:10px;
+    padding:14px 16px 12px;
+    color:#D8D3C4;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px);
+    user-select:none;
+  }
+  #hud-header{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:10px; letter-spacing:0.14em; text-transform:uppercase;
+    color:#8f8a78; margin-bottom:10px;
+  }
+  #hud-header .pct{ color:var(--rust); font-weight:700; }
+  #hud-track-wrap{
+    position:relative; height:24px;
+  }
+  #hud-ticks{
+    position:absolute; top:0; left:0; right:0; height:8px;
+    display:flex; justify-content:space-between;
+  }
+  #hud-ticks span{
+    width:1px; height:6px; background:#4a4636;
+  }
+  #hud-ticks span.major{ height:8px; background:#6b664f; }
+  #hud-track{
+    position:absolute; top:12px; left:0; right:0; height:2px;
+    background:#3a362a; border-radius:1px; cursor:pointer;
+  }
+  #hud-fill{
+    position:absolute; top:0; left:0; height:100%;
+    background:var(--rust); border-radius:1px;
+    width:0%;
+  }
+  #hud-playhead{
+    position:absolute; top:12px; left:0%;
+    width:11px; height:11px; margin-left:-5.5px; margin-top:-4.5px;
+    background:var(--rust);
+    transform:rotate(45deg);
+    border:2px solid #efe9d8;
+    cursor:grab;
+  }
+  #hud-playhead:active{ cursor:grabbing; }
+  #hud-footer{
+    display:flex; justify-content:space-between;
+    font-size:9.5px; margin-top:10px; color:#726d5a;
+    letter-spacing:0.08em;
+  }
+
+  #hint{
+    position:absolute; bottom:26px; right:32px; z-index:5;
+    font-size:10px; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:0.6; text-align:right; line-height:1.7;
+  }
+
+  @media (max-width: 720px){
+    #hud{ width: calc(100% - 64px); }
+    #hint{ display:none; }
+    #label-top{ max-width: 180px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scroll-spacer">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+
+    <div class="corner-label" id="label-top">
+      <div class="title">ASSEMBLY — DRIVE MODULE</div>
+      Scroll-linked explode · six concentric stages<br/>
+      rendered as hidden-line technical schematic
+    </div>
+
+    <div class="corner-label" id="label-plate">
+      <div class="idx">ASSY-004</div>
+      <div>REV C · SCALE 1:1</div>
+      <div>SHEET 01 OF 01</div>
+    </div>
+
+    <div id="hud">
+      <div id="hud-header">
+        <span>Timeline scrub</span>
+        <span class="pct" id="hud-pct">00%</span>
+      </div>
+      <div id="hud-track-wrap">
+        <div id="hud-ticks"></div>
+        <div id="hud-track">
+          <div id="hud-fill"></div>
+        </div>
+        <div id="hud-playhead"></div>
+      </div>
+      <div id="hud-footer">
+        <span id="hud-stage">STAGE · ASSEMBLED</span>
+        <span id="hud-frame">FR 000 / 240</span>
+      </div>
+    </div>
+
+    <div id="hint">
+      Scroll — explode assembly<br/>
+      Drag — orbit view<br/>
+      Move cursor — parallax tilt
+    </div>
+
+    <div id="load-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      z-index:20;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;
+      color:#55503f;background:transparent;pointer-events:none;">Loading renderer…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+  onerror="document.getElementById('load-status').innerHTML='Failed to load three.js from cdnjs.cloudflare.com.<br/>Check your network/ad-blocker and reload.'; document.getElementById('load-status').style.color='#B5651D';"></script>
+<script>
+(function(){
+  "use strict";
+  var statusEl = document.getElementById('load-status');
+  try {
+  if (typeof THREE === 'undefined') {
+    throw new Error('THREE failed to load — the CDN script did not execute.');
+  }
+
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var INK = 0x2A2823;
+  var BEIGE = 0xE7E1D2;
+  var BEIGE_PANEL = 0xEFEADC;
+
+  // ---------- renderer / scene / camera ----------
+  var canvas = document.getElementById('gl');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(BEIGE, 1);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BEIGE, 9, 22);
+
+  var camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  keyLight.position.set(4, 6, 6);
+  scene.add(keyLight);
+  var fillLight = new THREE.DirectionalLight(0xffffff, 0.25);
+  fillLight.position.set(-5, -3, -4);
+  scene.add(fillLight);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+  var lineMat = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.85 });
+  var lineMatSoft = new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.35 });
+  var bodyMat = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL, roughness: 0.85, metalness: 0.05,
+    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+  var bodyMatDeep = new THREE.MeshStandardMaterial({ color: 0xDCD5C1, roughness: 0.9, metalness: 0.05,
+    polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+
+  function edged(geometry, material, soft){
+    var mesh = new THREE.Mesh(geometry, material || bodyMat);
+    var edges = new THREE.EdgesGeometry(geometry, soft ? 25 : 12);
+    mesh.add(new THREE.LineSegments(edges, soft ? lineMatSoft : lineMat));
+    return mesh;
+  }
+
+  // top-level assembly: rotate so cylinder Y-axis (default) reads as horizontal on screen
+  var assembly = new THREE.Group();
+  assembly.rotation.z = Math.PI / 2;
+  scene.add(assembly);
+
+  var dragRotation = { x: 0, y: 0 };   // user-driven, persists
+  var parallax = { x: 0, y: 0 };       // cursor-driven, damped
+
+  // ================= MODULE BUILDERS =================
+
+  function hexBolt(r, h){
+    return new THREE.CylinderGeometry(r, r, h, 6);
+  }
+
+  function boltRing(count, radius, boltR, boltH, y){
+    var g = new THREE.Group();
+    for (var i = 0; i < count; i++){
+      var a = (i / count) * Math.PI * 2;
+      var m = edged(hexBolt(boltR, boltH), bodyMatDeep, true);
+      m.position.set(Math.cos(a) * radius, y, Math.sin(a) * radius);
+      m.rotation.x = Math.PI / 2;
+      g.add(m);
+    }
+    return g;
+  }
+
+  function toothRing(count, radius, toothSize, y, group){
+    for (var i = 0; i < count; i++){
+      var a = (i / count) * Math.PI * 2;
+      var t = edged(new THREE.BoxGeometry(toothSize[0], toothSize[1], toothSize[2]), bodyMat, true);
+      t.position.set(Math.cos(a) * radius, y, Math.sin(a) * radius);
+      t.rotation.y = -a;
+      group.add(t);
+    }
+  }
+
+  // ---- 1. Base / mounting flange ----
+  function buildFlange(){
+    var g = new THREE.Group();
+    var disc = edged(new THREE.CylinderGeometry(1.55, 1.6, 0.3, 48), bodyMat);
+    g.add(disc);
+    var hub = edged(new THREE.CylinderGeometry(0.5, 0.5, 0.36, 32), bodyMatDeep);
+    g.add(hub);
+    g.add(boltRing(12, 1.32, 0.055, 0.05, 0.16));
+    return { group: g, spin: 0.0007, pistons: null };
+  }
+
+  // ---- 2. Actuator / piston ring array ----
+  function buildPistonRing(){
+    var g = new THREE.Group();
+    var collar = edged(new THREE.CylinderGeometry(1.28, 1.28, 0.45, 48, 1, true), bodyMat);
+    g.add(collar);
+
+    var pistons = [];
+    var count = 9;
+    for (var i = 0; i < count; i++){
+      var a = (i / count) * Math.PI * 2;
+      var radius = 1.05;
+      var chamberGroup = new THREE.Group();
+      chamberGroup.position.set(Math.cos(a) * radius, 0, Math.sin(a) * radius);
+
+      var chamber = edged(new THREE.CylinderGeometry(0.16, 0.16, 0.55, 16), bodyMatDeep);
+      chamber.position.y = -0.05;
+      chamberGroup.add(chamber);
+
+      var rod = edged(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 10), bodyMat, true);
+      rod.position.y = 0.35; // slides along this axis
+      chamberGroup.add(rod);
+
+      g.add(chamberGroup);
+      pistons.push({ mesh: rod, phase: i * (Math.PI * 2 / count), baseY: 0.35 });
+    }
+    return { group: g, spin: -0.0011, pistons: pistons };
+  }
+
+  // ---- 3. Splined gear / bearing collar ----
+  function buildGearCollar(){
+    var g = new THREE.Group();
+    var collar = edged(new THREE.CylinderGeometry(1.22, 1.22, 0.32, 48), bodyMat);
+    g.add(collar);
+    toothRing(30, 1.32, [0.16, 0.09, 0.05], 0, g);
+    g.add(boltRing(10, 1.0, 0.045, 0.045, 0.17));
+    return { group: g, spin: 0.0026, pistons: null };
+  }
+
+  // ---- 4. Central control cylinder / housing ----
+  function buildCentralHousing(){
+    var g = new THREE.Group();
+    var drum = edged(new THREE.CylinderGeometry(1.0, 1.0, 1.7, 32), bodyMat);
+    g.add(drum);
+    g.add(boltRing(14, 0.95, 0.045, 0.05, 0.82));
+    g.add(boltRing(14, 0.95, 0.045, 0.05, -0.82));
+
+    // toggle switches on top surface
+    for (var i = -1; i <= 1; i++){
+      var sw = edged(new THREE.BoxGeometry(0.1, 0.16, 0.1), bodyMatDeep, true);
+      sw.position.set(0, i * 0.42, 1.0);
+      g.add(sw);
+      var base = edged(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 8), bodyMatDeep, true);
+      base.position.set(0, i * 0.42, 0.94);
+      base.rotation.x = Math.PI / 2;
+      g.add(base);
+    }
+
+    // seam lines (thin rings)
+    [-0.5, 0, 0.5].forEach(function(off){
+      var seam = new THREE.LineLoop(
+        new THREE.BufferGeometry().setFromPoints(
+          (function(){
+            var pts = [];
+            for (var i = 0; i <= 48; i++){
+              var a = (i / 48) * Math.PI * 2;
+              pts.push(new THREE.Vector3(Math.cos(a) * 1.005, off, Math.sin(a) * 1.005));
+            }
+            return pts;
+          })()
+        ),
+        lineMatSoft
+      );
+      g.add(seam);
+    });
+
+    return { group: g, spin: 0.0002, pistons: null };
+  }
+
+  // ---- 5. Planetary drive cage (skeletal) ----
+  function buildPlanetaryCage(){
+    var g = new THREE.Group();
+
+    var outerRing = edged(new THREE.TorusGeometry(1.05, 0.055, 8, 40), bodyMat);
+    outerRing.rotation.x = Math.PI / 2;
+    g.add(outerRing);
+
+    var innerRing = edged(new THREE.TorusGeometry(1.05, 0.055, 8, 40), bodyMat);
+    innerRing.rotation.x = Math.PI / 2;
+    innerRing.position.y = 0.9;
+    g.add(innerRing);
+
+    var hub = edged(new THREE.CylinderGeometry(0.28, 0.28, 1.0, 20), bodyMatDeep);
+    hub.position.y = 0.45;
+    g.add(hub);
+
+    var strutCount = 6;
+    var pinions = [];
+    for (var i = 0; i < strutCount; i++){
+      var a = (i / strutCount) * Math.PI * 2;
+      var strut = edged(new THREE.CylinderGeometry(0.035, 0.035, 0.9, 8), bodyMatDeep, true);
+      strut.position.set(Math.cos(a) * 1.05, 0.45, Math.sin(a) * 1.05);
+      g.add(strut);
+
+      // small planetary pinion riding mid-strut
+      var pinionGroup = new THREE.Group();
+      pinionGroup.position.set(Math.cos(a) * 1.05, 0.45, Math.sin(a) * 1.05);
+      var pinion = edged(new THREE.CylinderGeometry(0.14, 0.14, 0.12, 12), bodyMat, true);
+      pinion.rotation.x = Math.PI / 2;
+      pinionGroup.add(pinion);
+      toothRing(10, 0.16, [0.05, 0.03, 0.05], 0, pinionGroup);
+      g.add(pinionGroup);
+      pinions.push(pinionGroup);
+    }
+
+    return { group: g, spin: -0.0032, pistons: null, pinions: pinions };
+  }
+
+  // ---- 6. Outer adjustment ring (knurled) ----
+  function buildOuterRing(){
+    var g = new THREE.Group();
+    var ring = edged(new THREE.CylinderGeometry(1.38, 1.3, 0.55, 48, 1, true), bodyMat);
+    g.add(ring);
+
+    var ridgeCount = 64;
+    for (var i = 0; i < ridgeCount; i++){
+      var a = (i / ridgeCount) * Math.PI * 2;
+      var ridge = edged(new THREE.BoxGeometry(0.035, 0.5, 0.05), bodyMatDeep, true);
+      ridge.position.set(Math.cos(a) * 1.4, 0, Math.sin(a) * 1.4);
+      ridge.rotation.y = -a;
+      g.add(ridge);
+    }
+
+    var cap = edged(new THREE.CylinderGeometry(1.1, 1.1, 0.06, 48), bodyMatDeep);
+    cap.position.y = 0.29;
+    g.add(cap);
+    var bore = edged(new THREE.CylinderGeometry(0.55, 0.55, 0.08, 40, 1, true), bodyMat, true);
+    bore.position.y = 0.3;
+    g.add(bore);
+
+    return { group: g, spin: 0.0015, pistons: null };
+  }
+
+  // ================= ASSEMBLE ALONG SHARED AXIS =================
+  var modules = [
+    { build: buildFlange,         restY: -3.2, explodeY: -6.4, name: 'FLANGE / MOUNT' },
+    { build: buildPistonRing,     restY: -1.85, explodeY: -3.9, name: 'ACTUATOR ARRAY' },
+    { build: buildGearCollar,     restY: -0.75, explodeY: -1.7,  name: 'GEAR / BEARING COLLAR' },
+    { build: buildCentralHousing, restY:  0.35, explodeY: 0.3,   name: 'CENTRAL HOUSING' },
+    { build: buildPlanetaryCage,  restY:  1.55, explodeY: 2.6,   name: 'PLANETARY CAGE' },
+    { build: buildOuterRing,      restY:  2.75, explodeY: 5.1,   name: 'OUTER ADJUST RING' }
+  ];
+
+  var built = modules.map(function(m){
+    var res = m.build();
+    res.group.position.y = m.restY;
+    assembly.add(res.group);
+    res.restY = m.restY;
+    res.explodeY = m.explodeY;
+    res.name = m.name;
+    return res;
+  });
+
+  // ================= PROGRESS STATE (scroll or scrub) =================
+  var scrollProgress = 0;
+  var manualProgress = 0;
+  var isScrubbing = false;
+  var progress = 0;
+
+  function spacerHeight(){
+    return document.getElementById('scroll-spacer').offsetHeight - window.innerHeight;
+  }
+
+  function updateScrollProgress(){
+    scrollProgress = 0.5;
+  }
+  // Scroll-driven explosion was removed for the embedded dashboard panel.
+  // window.addEventListener('scroll', function(){
+  //   if (!isScrubbing){ updateScrollProgress(); }
+  // }, { passive: true });
+
+  // ================= HUD =================
+  var hudFill = document.getElementById('hud-fill');
+  var hudPlayhead = document.getElementById('hud-playhead');
+  var hudPct = document.getElementById('hud-pct');
+  var hudFrame = document.getElementById('hud-frame');
+  var hudStage = document.getElementById('hud-stage');
+  var hudTrack = document.getElementById('hud-track');
+  var hudTicksWrap = document.getElementById('hud-ticks');
+
+  (function buildTicks(){
+    for (var i = 0; i <= 20; i++){
+      var s = document.createElement('span');
+      if (i % 5 === 0) s.className = 'major';
+      hudTicksWrap.appendChild(s);
+    }
+  })();
+
+  function trackRect(){ return hudTrack.getBoundingClientRect(); }
+
+  function setManualFromClientX(clientX){
+    var r = trackRect();
+    var p = (clientX - r.left) / r.width;
+    manualProgress = Math.min(1, Math.max(0, p));
+  }
+
+  function scrubStart(e){
+    isScrubbing = true;
+    setManualFromClientX(e.touches ? e.touches[0].clientX : e.clientX);
+    window.addEventListener('pointermove', scrubMove);
+    window.addEventListener('pointerup', scrubEnd);
+  }
+  function scrubMove(e){
+    if (!isScrubbing) return;
+    setManualFromClientX(e.clientX);
+  }
+  function scrubEnd(){
+    isScrubbing = false;
+    window.removeEventListener('pointermove', scrubMove);
+    window.removeEventListener('pointerup', scrubEnd);
+  }
+  hudTrack.addEventListener('pointerdown', scrubStart);
+  hudPlayhead.addEventListener('pointerdown', function(e){ e.stopPropagation(); scrubStart(e); });
+
+  var stageNames = ['ASSEMBLED', 'STAGING', 'PARTIAL EXPLODE', 'MID EXPLODE', 'FULL EXPLODE'];
+  function stageLabelFor(p){
+    var idx = Math.min(stageNames.length - 1, Math.floor(p * stageNames.length));
+    return stageNames[idx];
+  }
+
+  // ================= DRAG ORBIT (with inertia) =================
+  var dragging = false;
+  var lastX = 0, lastY = 0;
+  var velocity = { x: 0, y: 0 };
+  var DAMPING = 0.90;
+  var SENSITIVITY = 0.006;
+
+  canvas.addEventListener('pointerdown', function(e){
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    velocity.x = 0; velocity.y = 0;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', function(e){
+    if (!dragging) return;
+    var dx = e.clientX - lastX;
+    var dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    velocity.y = dx * SENSITIVITY;
+    velocity.x = dy * SENSITIVITY;
+    dragRotation.y += velocity.y;
+    dragRotation.x = Math.max(-0.6, Math.min(0.6, dragRotation.x + velocity.x));
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; });
+  window.addEventListener('pointercancel', function(){ dragging = false; });
+
+  // ---- hover parallax ----
+  var mouseNorm = { x: 0, y: 0 };
+  window.addEventListener('pointermove', function(e){
+    mouseNorm.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNorm.y = (e.clientY / window.innerHeight) * 2 - 1;
+  });
+
+  // ================= RESIZE =================
+  function resize(){
+    var w = window.innerWidth, h = window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  updateScrollProgress();
+
+  // ================= ANIMATE =================
+  var clock = new THREE.Clock();
+  var idleScale = reducedMotion ? 0 : 1;
+
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt = Math.min(clock.getDelta(), 0.05);
+    var elapsed = clock.getElapsedTime();
+
+    // ---- progress ----
+    var target = isScrubbing ? manualProgress : (reducedMotion ? 0.5 : 0.5 + Math.sin(elapsed * 0.38) * 0.42);
+    progress += (target - progress) * 0.12;
+
+    // ---- explode + per-module idle spin ----
+    built.forEach(function(m){
+      m.group.position.y = m.restY + (m.explodeY - m.restY) * progress;
+      m.group.rotation.y += m.spin * (1 + idleScale) * (dt * 60);
+      if (m.pistons){
+        m.pistons.forEach(function(p){
+          var amp = 0.16 * (0.35 + progress * 0.65);
+          p.mesh.position.y = p.baseY + Math.sin(elapsed * 2.4 + p.phase) * amp * idleScale;
+        });
+      }
+      if (m.pinions){
+        m.pinions.forEach(function(pin, i){
+          pin.rotation.y += 0.02 * idleScale * (dt * 60) * (i % 2 === 0 ? 1 : -1);
+        });
+      }
+    });
+
+    // ---- drag inertia decay ----
+    if (!dragging){
+      velocity.x *= DAMPING;
+      velocity.y *= DAMPING;
+      dragRotation.y += velocity.y;
+      dragRotation.x = Math.max(-0.6, Math.min(0.6, dragRotation.x + velocity.x));
+    }
+
+    // ---- hover parallax (damped) ----
+    parallax.x += (mouseNorm.y * 0.18 - parallax.x) * 0.06;
+    parallax.y += (mouseNorm.x * 0.22 - parallax.y) * 0.06;
+
+    assembly.rotation.x = dragRotation.x + parallax.x;
+    assembly.rotation.z = Math.PI / 2 + dragRotation.y * 0 ; // keep base orientation
+    assembly.rotation.y = dragRotation.y + parallax.y;
+
+    // ---- cinematic camera orbit driven by scroll progress ----
+    var az = -0.65 + progress * 1.15;
+    var el = 0.32 - progress * 0.08;
+    var radius = 7.0 + progress * 4.6;
+    camera.position.set(
+      Math.sin(az) * radius * Math.cos(el),
+      Math.sin(el) * radius,
+      Math.cos(az) * radius * Math.cos(el)
+    );
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+
+    // ---- HUD sync ----
+    var pctVal = Math.round(progress * 100);
+    hudFill.style.width = pctVal + '%';
+    hudPlayhead.style.left = pctVal + '%';
+    hudPct.textContent = (pctVal < 10 ? '0' : '') + pctVal + '%';
+    hudFrame.textContent = 'FR ' + String(Math.round(progress * 240)).padStart(3, '0') + ' / 240';
+    hudStage.textContent = 'STAGE · ' + stageLabelFor(progress);
+  }
+
+  statusEl.style.display = 'none';
+  frame();
+
+  } catch (err) {
+    statusEl.style.display = 'flex';
+    statusEl.style.color = '#B5651D';
+    statusEl.style.pointerEvents = 'auto';
+    statusEl.style.padding = '24px';
+    statusEl.style.textAlign = 'center';
+    statusEl.innerHTML = 'Render error: ' + (err && err.message ? err.message : err) +
+      '<br/><span style="opacity:0.6;font-size:10px;">Open devtools console for the full stack trace.</span>';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

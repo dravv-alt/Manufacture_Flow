@@ -1,3 +1,4 @@
+// demo_data
 export interface Workstation {
   id: string;
   name: string;
@@ -106,6 +107,32 @@ export const MOCK_WORKSTATIONS: Workstation[] = [
     ],
     eventLogs: [
       { time: '00:00 IST', event: 'Normal operational cycle ongoing', type: 'info' }
+    ]
+  },
+  {
+    id: 'WS-114',
+    name: 'Conveyor & Manipulator Line Gamma',
+    line: 'L-02',
+    status: 'Operational',
+    currentJob: 'J1004',
+    capacity: 72,
+    temperature: 46.3,
+    vibration: 1.3,
+    pressure: 4.5,
+    cycleCount: 68400,
+    motorCurrent: 10.2,
+    errorLogsCount: 0,
+    health: 'Good',
+    failureProb: 14,
+    predictedComponent: 'â€”',
+    estimatedTTF: 'â€”',
+    rul: 'â€”',
+    lastMaintenance: '18-Jul 2026',
+    historyLogs: [
+      { date: '18-Jul 2026', description: 'Manipulator gripper alignment' }
+    ],
+    eventLogs: [
+      { time: '02:12 IST', event: 'Conveyor and manipulator sequence nominal', type: 'info' }
     ]
   },
   {

@@ -1,0 +1,11 @@
+Model Information:
+* title:	HAAS VF-2SS CNC
+* source:	https://sketchfab.com/3d-models/haas-vf-2ss-cnc-c5543433d12944d482357697c396f7c8
+* author:	Earnect (https://sketchfab.com/Earnect)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "HAAS VF-2SS CNC" (https://sketchfab.com/3d-models/haas-vf-2ss-cnc-c5543433d12944d482357697c396f7c8) by Earnect (https://sketchfab.com/Earnect) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

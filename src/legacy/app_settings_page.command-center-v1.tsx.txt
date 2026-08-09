@@ -1,0 +1,6 @@
+// ACTIVE SETTINGS ROUTE V1 — preserved before the dedicated settings implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function SettingsPage() {
+//   return <CommandCenter view="settings" />;
+// }

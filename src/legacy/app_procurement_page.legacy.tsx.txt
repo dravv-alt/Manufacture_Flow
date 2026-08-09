@@ -1,0 +1,191 @@
+// LEGACY ROUTE — preserved before replacement.
+// "use client";
+// 
+// import React from 'react';
+// 
+// export default function ProcurementPage() {
+//   return (
+//     <div className="flex flex-col -mt-10 -mx-10 md:-mx-16">
+//       {/* Top Nav (Desktop) */}
+//       <header className="w-full h-16 bg-transparent flex justify-between items-center mb-8 hidden md:flex pl-8 pr-8 mt-4">
+//         <div className="flex items-center gap-6">
+//           <span className="text-[20px] font-[600] text-primary">Industrial Serenity</span>
+//           <div className="h-6 w-px bg-surface-variant"></div>
+//           <nav className="flex gap-6">
+//             <span className="text-on-surface-variant pb-1 hover:text-primary transition-colors text-sm font-medium">Mumbai Plant</span>
+//             <span className="text-on-surface-variant pb-1 hover:text-primary transition-colors text-sm font-medium">Systems Online</span>
+//           </nav>
+//         </div>
+//         <div className="flex items-center gap-4">
+//           <div className="relative bg-surface-container-low rounded-full px-4 py-2 flex items-center gap-2 shadow-inner w-64">
+//             <span className="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+//             <input className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-on-surface-variant text-on-surface outline-none" placeholder="Search operations..." type="text"/>
+//           </div>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">notifications</span></button>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">settings</span></button>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">help</span></button>
+//         </div>
+//       </header>
+//       
+//       <div className="flex-1 px-4 md:px-8 lg:px-12 pb-12">
+//         <div className="max-w-4xl mx-auto space-y-6">
+//           
+//           {/* CARD 1: PURCHASE REQUISITION */}
+//           <section className="bg-surface-container-lowest rounded-2xl border border-surface-variant border-l-[3px] border-l-amber-500 p-8 shadow-sm relative">
+//             <div className="flex justify-between items-start mb-6">
+//               <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary">PURCHASE REQUISITION</h2>
+//               <span className="font-mono text-[14px] font-bold text-primary">PR-2024-00891</span>
+//             </div>
+//             
+//             <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8 text-sm">
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Failure Case</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">FC-2024-0047</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Workstation</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">WS-102</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Required Component</p>
+//                 <p className="font-medium text-primary">Servo Motor Bearing</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Part Number</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">BRG-10023</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Quantity</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">2</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Required Date</p>
+//                 <p className="font-medium text-primary">Immediate</p>
+//               </div>
+//             </div>
+//             
+//             <div className="flex items-center gap-3 mb-6">
+//               <span className="text-on-surface-variant text-xs font-semibold uppercase tracking-wider">Status:</span>
+//               <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[10px] font-bold tracking-wider border border-amber-500/20 uppercase">
+//                 AUTO-GENERATED
+//               </span>
+//             </div>
+//             
+//             <hr className="border-t border-surface-variant mb-6" />
+//             
+//             {/* APPROVED VENDOR Sub-section */}
+//             <div>
+//               <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-4">APPROVED VENDOR</h3>
+//               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+//                 <div className="col-span-2">
+//                   <p className="text-on-surface-variant text-xs mb-1">Vendor</p>
+//                   <p className="font-medium text-primary">Precision Bearings India Pvt Ltd</p>
+//                 </div>
+//                 <div className="col-span-2">
+//                   <p className="text-on-surface-variant text-xs mb-1">Contact</p>
+//                   <p className="text-primary">procurement@precisionbearings.in</p>
+//                 </div>
+//                 <div>
+//                   <p className="text-on-surface-variant text-xs mb-1">Lead Time</p>
+//                   <p className="font-medium text-primary">2 Days</p>
+//                 </div>
+//                 <div>
+//                   <p className="text-on-surface-variant text-xs mb-1">Exp. Dispatch</p>
+//                   <p className="font-mono text-[13px] text-primary">07-Aug 2026</p>
+//                 </div>
+//                 <div className="col-span-2">
+//                   <p className="text-on-surface-variant text-xs mb-1">Exp. Delivery</p>
+//                   <p className="font-mono text-[13px] text-primary">08-Aug 2026</p>
+//                 </div>
+//               </div>
+//             </div>
+//           </section>
+//           
+//           {/* CARD 2: VENDOR NOTIFICATION */}
+//           <section className="bg-surface-container-lowest rounded-2xl border border-surface-variant p-0 shadow-sm relative overflow-hidden">
+//             <div className="p-6 border-b border-surface-variant flex justify-between items-center bg-[#fcfcfc]">
+//               <div className="flex items-center gap-2">
+//                 <span className="material-symbols-outlined text-[#10b981] text-[20px]">forward_to_inbox</span>
+//                 <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary">VENDOR NOTIFICATION</h2>
+//               </div>
+//               <span className="px-2 py-0.5 rounded-full bg-[#10b981]/10 text-[#10b981] text-[10px] font-bold tracking-wider border border-[#10b981]/20 uppercase">
+//                 SENT
+//               </span>
+//             </div>
+//             
+//             <div className="p-6 border-b border-surface-variant">
+//               <div className="grid grid-cols-[60px_1fr] gap-y-2 text-sm mb-6">
+//                 <div className="text-on-surface-variant text-xs font-semibold pt-0.5">To:</div>
+//                 <div className="text-primary font-medium">procurement@precisionbearings.in</div>
+//                 
+//                 <div className="text-on-surface-variant text-xs font-semibold pt-0.5">CC:</div>
+//                 <div className="text-primary">warehouse@plant.com, procurement@plant.com</div>
+//                 
+//                 <div className="text-on-surface-variant text-xs font-semibold pt-0.5 mt-2">Subject:</div>
+//                 <div className="text-primary font-bold mt-2">URGENT: Spare Part Requirement Ã¢â‚¬â€ BRG-10023</div>
+//               </div>
+//               
+//               <div className="bg-[#f3f3f3] rounded-xl p-5 border border-surface-variant text-sm text-primary leading-relaxed">
+//                 Dear Precision Bearings Team,
+//                 <br /><br />
+//                 We require an immediate dispatch of 2x BRG-10023 Servo Motor Bearings for critical workstation WS-102. Please confirm receipt and dispatch window.
+//                 <br /><br />
+//                 Regards,<br />
+//                 Automated Procurement System<br />
+//                 Mumbai Plant
+//               </div>
+//             </div>
+//             
+//             <div className="p-6 bg-[#fcfcfc]">
+//               <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-4">DELIVERY CONFIRMATIONS</h4>
+//               <div className="space-y-3">
+//                 <div className="flex items-center justify-between text-sm">
+//                   <div className="flex items-center gap-2 text-on-surface">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[18px]">check</span>
+//                     Precision Bearings
+//                   </div>
+//                   <div className="flex items-center gap-3">
+//                     <span className="text-on-surface-variant italic text-xs">notified</span>
+//                     <span className="font-mono text-[13px] text-on-surface-variant">17:04:12</span>
+//                   </div>
+//                 </div>
+//                 <div className="flex items-center justify-between text-sm">
+//                   <div className="flex items-center gap-2 text-on-surface">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[18px]">check</span>
+//                     Warehouse
+//                   </div>
+//                   <div className="flex items-center gap-3">
+//                     <span className="text-on-surface-variant italic text-xs">notified</span>
+//                     <span className="font-mono text-[13px] text-on-surface-variant">17:04:15</span>
+//                   </div>
+//                 </div>
+//                 <div className="flex items-center justify-between text-sm">
+//                   <div className="flex items-center gap-2 text-on-surface">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[18px]">check</span>
+//                     Procurement
+//                   </div>
+//                   <div className="flex items-center gap-3">
+//                     <span className="text-on-surface-variant italic text-xs">notified</span>
+//                     <span className="font-mono text-[13px] text-on-surface-variant">17:04:18</span>
+//                   </div>
+//                 </div>
+//               </div>
+//             </div>
+//           </section>
+//           
+//           {/* Bottom Warning Note */}
+//           <div className="mt-8 border border-amber-500 rounded-xl bg-amber-500/5 p-4 flex gap-3 items-start">
+//             <span className="material-symbols-outlined text-amber-600 mt-0.5">info</span>
+//             <p className="text-sm text-amber-700 font-medium">
+//               Financial authorization is handled through your existing approval/ERP process (out of system scope).
+//             </p>
+//           </div>
+// 
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+// 
+// 
+// 

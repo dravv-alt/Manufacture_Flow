@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lens / Exploded Optical Assembly</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+<style>
+  :root{
+    --beige: #E7E1D2;
+    --ink: #2A2823;
+    --ink-soft: #55503f;
+    --rust: #7A6A3D;
+    --hud-bg: rgba(20,18,14,0.92);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--beige); color:var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-x:hidden; }
+  #scroll-spacer{ height: 420vh; position:relative; }
+  #stage{ position:sticky; top:0; left:0; width:100%; height:100vh; overflow:hidden; }
+  canvas#gl{ display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
+  canvas#gl:active{ cursor:grabbing; }
+  .corner-label{ position:absolute; z-index:5; font-size:11px; letter-spacing:0.14em;
+    text-transform:uppercase; color:var(--ink-soft); pointer-events:none; line-height:1.6; }
+  #label-top{ top:28px; left:32px; max-width: 280px; }
+  #label-top .title{ font-size:13px; color:var(--ink); font-weight:600; margin-bottom:6px; letter-spacing:0.08em; }
+  #label-plate{ top:28px; right:32px; text-align:right; }
+  #label-plate div{ opacity:0.75; }
+  #label-plate .idx{ color:var(--rust); font-weight:700; opacity:1; }
+  #hud{ position:absolute; bottom:26px; left:32px; z-index:10; width:320px; background:var(--hud-bg);
+    border-radius:10px; padding:14px 16px 12px; color:#D8D3C4; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    backdrop-filter: blur(4px); user-select:none; }
+  #hud-header{ display:flex; justify-content:space-between; align-items:baseline; font-size:10px;
+    letter-spacing:0.14em; text-transform:uppercase; color:#8f8a78; margin-bottom:10px; }
+  #hud-header .pct{ color:var(--rust); font-weight:700; }
+  #hud-track-wrap{ position:relative; height:24px; }
+  #hud-ticks{ position:absolute; top:0; left:0; right:0; height:8px; display:flex; justify-content:space-between; }
+  #hud-ticks span{ width:1px; height:6px; background:#4a4636; }
+  #hud-ticks span.major{ height:8px; background:#6b664f; }
+  #hud-track{ position:absolute; top:12px; left:0; right:0; height:2px; background:#3a362a; border-radius:1px; cursor:pointer; }
+  #hud-fill{ position:absolute; top:0; left:0; height:100%; background:var(--rust); border-radius:1px; width:0%; }
+  #hud-playhead{ position:absolute; top:12px; left:0%; width:11px; height:11px; margin-left:-5.5px; margin-top:-4.5px;
+    background:var(--rust); transform:rotate(45deg); border:2px solid #efe9d8; cursor:grab; }
+  #hud-footer{ display:flex; justify-content:space-between; font-size:9.5px; margin-top:10px; color:#726d5a; letter-spacing:0.08em; }
+  #hint{ position:absolute; bottom:26px; right:32px; z-index:5; font-size:10px; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--ink-soft); opacity:0.6; text-align:right; line-height:1.7; }
+  @media (max-width: 720px){ #hud{ width: calc(100% - 64px); } #hint{ display:none; } #label-top{ max-width: 180px; } }
+</style>
+</head>
+<body>
+<div id="scroll-spacer">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div class="corner-label" id="label-top">
+      <div class="title">OPTICAL ASSEMBLY — PRIME LENS</div>
+      Scroll-linked explode · six element groups<br/>iris diaphragm closes as barrel extends
+    </div>
+    <div class="corner-label" id="label-plate">
+      <div class="idx">OPT-017</div>
+      <div>REV A · SCALE 2:1</div>
+      <div>SHEET 01 OF 01</div>
+    </div>
+    <div id="hud">
+      <div id="hud-header"><span>Timeline scrub</span><span class="pct" id="hud-pct">00%</span></div>
+      <div id="hud-track-wrap">
+        <div id="hud-ticks"></div>
+        <div id="hud-track"><div id="hud-fill"></div></div>
+        <div id="hud-playhead"></div>
+      </div>
+      <div id="hud-footer"><span id="hud-stage">STAGE · SEATED</span><span id="hud-frame">FR 000 / 240</span></div>
+    </div>
+    <div id="hint">Scroll — explode assembly<br/>Drag — orbit view<br/>Move cursor — parallax tilt</div>
+
+    <div id="load-status" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      z-index:20;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;
+      color:#55503f;background:transparent;pointer-events:none;">Loading renderer…</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"
+  onerror="document.getElementById('load-status').innerHTML='Failed to load three.js from cdnjs.cloudflare.com.<br/>Check your network/ad-blocker and reload.'; document.getElementById('load-status').style.color='#7A6A3D';"></script>
+<script>
+(function(){
+  "use strict";
+  var statusEl = document.getElementById('load-status');
+  try {
+  if (typeof THREE === 'undefined') {
+    throw new Error('THREE failed to load — the CDN script did not execute.');
+  }
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var INK = 0x2A2823, BEIGE = 0xE7E1D2, BEIGE_PANEL = 0xEFEADC;
+
+  var canvas = document.getElementById('gl');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setClearColor(BEIGE, 1);
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(BEIGE, 9, 22);
+  var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  keyLight.position.set(4,6,6);
+  scene.add(keyLight);
+  var fill = new THREE.DirectionalLight(0xffffff, 0.25); fill.position.set(-5,-3,-4); scene.add(fill);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+  var lineMat = new THREE.LineBasicMaterial({ color: INK, transparent:true, opacity:0.85 });
+  var lineMatSoft = new THREE.LineBasicMaterial({ color: INK, transparent:true, opacity:0.32 });
+  var bodyMat = new THREE.MeshStandardMaterial({ color: BEIGE_PANEL, roughness:0.85, metalness:0.05,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+  var bodyMatDeep = new THREE.MeshStandardMaterial({ color: 0xDCD5C1, roughness:0.9, metalness:0.05,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+  var glassMat = new THREE.MeshStandardMaterial({ color: 0xEDE8D9, roughness:0.15, metalness:0.2, transparent:true, opacity:0.55,
+    polygonOffset:true, polygonOffsetFactor:1, polygonOffsetUnits:1 });
+
+  function edged(geometry, material, soft){
+    var mesh = new THREE.Mesh(geometry, material || bodyMat);
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geometry, soft?25:12), soft?lineMatSoft:lineMat));
+    return mesh;
+  }
+
+  var assembly = new THREE.Group();
+  assembly.rotation.z = Math.PI / 2;
+  scene.add(assembly);
+
+  var dragRotation = { x:0, y:0 };
+  var parallax = { x:0, y:0 };
+
+  function boltRing(count, radius, boltR, boltH, y){
+    var g = new THREE.Group();
+    for (var i=0;i<count;i++){
+      var a=(i/count)*Math.PI*2;
+      var m=edged(new THREE.CylinderGeometry(boltR,boltR,boltH,6), bodyMatDeep, true);
+      m.position.set(Math.cos(a)*radius,y,Math.sin(a)*radius);
+      m.rotation.x=Math.PI/2;
+      g.add(m);
+    }
+    return g;
+  }
+
+  function threadRidges(count, radius, y, ridgeSize){
+    var g = new THREE.Group();
+    for (var i=0;i<count;i++){
+      var a=(i/count)*Math.PI*2;
+      var r=edged(new THREE.BoxGeometry(ridgeSize[0],ridgeSize[1],ridgeSize[2]), bodyMatDeep, true);
+      r.position.set(Math.cos(a)*radius,y,Math.sin(a)*radius);
+      r.rotation.y=-a;
+      g.add(r);
+    }
+    return g;
+  }
+
+  // ---- 1. Rear bayonet mount ----
+  function buildMount(){
+    var g = new THREE.Group();
+    var ring = edged(new THREE.CylinderGeometry(0.95,1.0,0.22,48), bodyMat);
+    g.add(ring);
+    g.add(boltRing(8, 0.82, 0.045, 0.05, 0.12));
+    // bayonet tabs
+    for (var i=0;i<3;i++){
+      var a=(i/3)*Math.PI*2;
+      var tab = edged(new THREE.BoxGeometry(0.28,0.06,0.14), bodyMatDeep, true);
+      tab.position.set(Math.cos(a)*0.98, 0.13, Math.sin(a)*0.98);
+      tab.rotation.y=-a;
+      g.add(tab);
+    }
+    return { group:g, spin:0.0003 };
+  }
+
+  // ---- 2. Rear lens group ----
+  function buildRearGroup(){
+    var g = new THREE.Group();
+    var lens = edged(new THREE.CylinderGeometry(0.78,0.7,0.3,40), glassMat);
+    g.add(lens);
+    var retainer = edged(new THREE.CylinderGeometry(0.9,0.9,0.06,40,1,true), bodyMatDeep, true);
+    retainer.position.y = 0.18;
+    g.add(retainer);
+    return { group:g, spin:0.0006 };
+  }
+
+  // ---- 3. Focus helicoid barrel (rotates + also travels slightly) ----
+  function buildHelicoid(){
+    var g = new THREE.Group();
+    var barrel = edged(new THREE.CylinderGeometry(0.92,0.92,0.7,48,1,true), bodyMat);
+    g.add(barrel);
+    var knurl = threadRidges(72, 0.96, 0, [0.03,0.62,0.045]);
+    g.add(knurl);
+    var distanceScale = edged(new THREE.TorusGeometry(0.95,0.02,6,48), bodyMatDeep, true);
+    distanceScale.rotation.x = Math.PI/2;
+    distanceScale.position.y = 0.36;
+    g.add(distanceScale);
+    return { group:g, spin:0.0022 };
+  }
+
+  // ---- 4. Iris diaphragm (unique: blades close as progress increases) ----
+  function buildIris(){
+    var g = new THREE.Group();
+    var housing = edged(new THREE.CylinderGeometry(0.9,0.9,0.16,48,1,true), bodyMat, true);
+    g.add(housing);
+    var bladeCount = 9;
+    var blades = [];
+    for (var i=0;i<bladeCount;i++){
+      var a = (i/bladeCount)*Math.PI*2;
+      var pivot = new THREE.Group();
+      pivot.position.set(Math.cos(a)*0.62, 0, Math.sin(a)*0.62);
+      pivot.rotation.y = -a;
+      var bladeGeo = new THREE.BoxGeometry(0.62,0.03,0.5);
+      bladeGeo.translate(0.31,0,0.1); // shift pivot to edge, before edges are computed
+      var blade = edged(bladeGeo, bodyMatDeep, true);
+      pivot.add(blade);
+      pivot.rotation.z = 0.15; // open state
+      g.add(pivot);
+      blades.push(pivot);
+    }
+    return { group:g, spin:0, iris:blades };
+  }
+
+  // ---- 5. Middle lens group ----
+  function buildMiddleGroup(){
+    var g = new THREE.Group();
+    var lens = edged(new THREE.CylinderGeometry(0.98,0.9,0.34,40), glassMat);
+    g.add(lens);
+    g.add(boltRing(6, 0.7, 0.04, 0.04, -0.2));
+    return { group:g, spin:-0.0009 };
+  }
+
+  // ---- 6. Front element + filter ring ----
+  function buildFrontGroup(){
+    var g = new THREE.Group();
+    var lens = edged(new THREE.CylinderGeometry(1.05,0.98,0.5,44), glassMat);
+    g.add(lens);
+    var filterRing = edged(new THREE.CylinderGeometry(1.15,1.15,0.12,44,1,true), bodyMat);
+    filterRing.position.y = 0.28;
+    g.add(filterRing);
+    g.add(threadRidges(90, 1.16, 0.28, [0.02,0.1,0.02]));
+    var bezel = edged(new THREE.CylinderGeometry(1.02,1.02,0.04,44,1,true), bodyMatDeep, true);
+    bezel.position.y = 0.36;
+    g.add(bezel);
+    return { group:g, spin:0.0004 };
+  }
+
+  var modules = [
+    { build: buildMount,        restY:-2.6, explodeY:-5.4 },
+    { build: buildRearGroup,    restY:-1.55, explodeY:-3.2 },
+    { build: buildHelicoid,     restY:-0.55, explodeY:-1.1 },
+    { build: buildIris,         restY: 0.15, explodeY: 0.2 },
+    { build: buildMiddleGroup,  restY: 0.9,  explodeY: 2.0 },
+    { build: buildFrontGroup,   restY: 1.85, explodeY: 4.4 }
+  ];
+
+  var built = modules.map(function(m){
+    var res = m.build();
+    res.group.position.y = m.restY;
+    assembly.add(res.group);
+    res.restY = m.restY; res.explodeY = m.explodeY;
+    return res;
+  });
+
+  var scrollProgress=0, manualProgress=0, isScrubbing=false, progress=0;
+  function spacerHeight(){ return document.getElementById('scroll-spacer').offsetHeight - window.innerHeight; }
+  function updateScrollProgress(){ var max=spacerHeight(); scrollProgress = max>0 ? Math.min(1,Math.max(0,window.scrollY/max)) : 0; }
+  window.addEventListener('scroll', function(){ if(!isScrubbing) updateScrollProgress(); }, {passive:true});
+
+  var hudFill=document.getElementById('hud-fill'), hudPlayhead=document.getElementById('hud-playhead');
+  var hudPct=document.getElementById('hud-pct'), hudFrame=document.getElementById('hud-frame');
+  var hudStage=document.getElementById('hud-stage'), hudTrack=document.getElementById('hud-track');
+  var hudTicksWrap=document.getElementById('hud-ticks');
+  (function(){ for(var i=0;i<=20;i++){ var s=document.createElement('span'); if(i%5===0)s.className='major'; hudTicksWrap.appendChild(s); } })();
+  function trackRect(){ return hudTrack.getBoundingClientRect(); }
+  function setManualFromClientX(x){ var r=trackRect(); manualProgress=Math.min(1,Math.max(0,(x-r.left)/r.width)); }
+  function scrubStart(e){ isScrubbing=true; setManualFromClientX(e.touches?e.touches[0].clientX:e.clientX);
+    window.addEventListener('pointermove', scrubMove); window.addEventListener('pointerup', scrubEnd); }
+  function scrubMove(e){ if(isScrubbing) setManualFromClientX(e.clientX); }
+  function scrubEnd(){ isScrubbing=false; window.removeEventListener('pointermove', scrubMove); window.removeEventListener('pointerup', scrubEnd); }
+  hudTrack.addEventListener('pointerdown', scrubStart);
+  hudPlayhead.addEventListener('pointerdown', function(e){ e.stopPropagation(); scrubStart(e); });
+
+  var stageNames=['SEATED','RACKING OUT','APERTURE CLOSING','GROUPS SEPARATED','FULLY EXPLODED'];
+  function stageLabelFor(p){ return stageNames[Math.min(stageNames.length-1, Math.floor(p*stageNames.length))]; }
+
+  var dragging=false, lastX=0, lastY=0, velocity={x:0,y:0}, DAMPING=0.90, SENSITIVITY=0.006;
+  canvas.addEventListener('pointerdown', function(e){ dragging=true; lastX=e.clientX; lastY=e.clientY; velocity.x=0; velocity.y=0; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', function(e){ if(!dragging) return;
+    var dx=e.clientX-lastX, dy=e.clientY-lastY; lastX=e.clientX; lastY=e.clientY;
+    velocity.y=dx*SENSITIVITY; velocity.x=dy*SENSITIVITY;
+    dragRotation.y+=velocity.y; dragRotation.x=Math.max(-0.6,Math.min(0.6,dragRotation.x+velocity.x)); });
+  window.addEventListener('pointerup', function(){ dragging=false; });
+  window.addEventListener('pointercancel', function(){ dragging=false; });
+
+  var mouseNorm={x:0,y:0};
+  window.addEventListener('pointermove', function(e){ mouseNorm.x=(e.clientX/window.innerWidth)*2-1; mouseNorm.y=(e.clientY/window.innerHeight)*2-1; });
+
+  function resize(){ var w=window.innerWidth,h=window.innerHeight; renderer.setSize(w,h); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+  window.addEventListener('resize', resize); resize(); updateScrollProgress();
+
+  var clock = new THREE.Clock();
+  var idleScale = reducedMotion ? 0 : 1;
+
+  function frame(){
+    requestAnimationFrame(frame);
+    var dt = Math.min(clock.getDelta(), 0.05);
+
+    var target = isScrubbing ? manualProgress : scrollProgress;
+    progress += (target - progress) * 0.12;
+
+    built.forEach(function(m){
+      m.group.position.y = m.restY + (m.explodeY - m.restY) * progress;
+      if (m.spin) m.group.rotation.y += m.spin * (1+idleScale) * (dt*60);
+      if (m.iris){
+        var closeAmt = 0.15 + progress * 1.1; // radians, opens->closes
+        m.iris.forEach(function(pivot){ pivot.rotation.z = closeAmt; });
+      }
+    });
+
+    if (!dragging){
+      velocity.x*=DAMPING; velocity.y*=DAMPING;
+      dragRotation.y+=velocity.y;
+      dragRotation.x=Math.max(-0.6,Math.min(0.6,dragRotation.x+velocity.x));
+    }
+
+    parallax.x += (mouseNorm.y*0.18 - parallax.x)*0.06;
+    parallax.y += (mouseNorm.x*0.22 - parallax.y)*0.06;
+
+    assembly.rotation.x = dragRotation.x + parallax.x;
+    assembly.rotation.y = dragRotation.y + parallax.y;
+
+    var az = -0.55 + progress*1.0, el = 0.3 - progress*0.06, radius = 6.4 + progress*4.2;
+    camera.position.set(Math.sin(az)*radius*Math.cos(el), Math.sin(el)*radius, Math.cos(az)*radius*Math.cos(el));
+    camera.lookAt(0,0,0);
+
+    renderer.render(scene, camera);
+
+    var pctVal = Math.round(progress*100);
+    hudFill.style.width = pctVal+'%';
+    hudPlayhead.style.left = pctVal+'%';
+    hudPct.textContent = (pctVal<10?'0':'')+pctVal+'%';
+    hudFrame.textContent = 'FR ' + String(Math.round(progress*240)).padStart(3,'0') + ' / 240';
+    hudStage.textContent = 'STAGE · ' + stageLabelFor(progress);
+  }
+  statusEl.style.display = 'none';
+  frame();
+
+  } catch (err) {
+    statusEl.style.display = 'flex';
+    statusEl.style.color = '#7A6A3D';
+    statusEl.style.pointerEvents = 'auto';
+    statusEl.style.padding = '24px';
+    statusEl.style.textAlign = 'center';
+    statusEl.innerHTML = 'Render error: ' + (err && err.message ? err.message : err) +
+      '<br/><span style="opacity:0.6;font-size:10px;">Open devtools console for the full stack trace.</span>';
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

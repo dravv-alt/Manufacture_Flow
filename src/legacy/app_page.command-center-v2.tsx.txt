@@ -1,0 +1,6 @@
+// ACTIVE HOME ROUTE V2 — preserved before the executive dashboard visual adaptation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function Page() {
+//   return <CommandCenter />;
+// }

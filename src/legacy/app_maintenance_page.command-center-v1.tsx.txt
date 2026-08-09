@@ -1,0 +1,6 @@
+// ACTIVE MAINTENANCE ROUTE V1 — preserved before the dedicated maintenance implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function MaintenancePage() {
+//   return <CommandCenter view="maintenance" />;
+// }

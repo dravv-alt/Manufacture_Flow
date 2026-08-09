@@ -1,0 +1,405 @@
+// LEGACY ROUTE — preserved before replacement.
+// "use client";
+// 
+// import React, { useState } from 'react';
+// import { useParams, useRouter } from 'next/navigation';
+// import { useDashboard } from '@/contexts/DashboardContext';
+// 
+// export default function FailureCasePage() {
+//   const [acknowledged, setAcknowledged] = useState(false);
+//   const [proposalAccepted, setProposalAccepted] = useState(false);
+//   const params = useParams();
+//   const router = useRouter();
+//   const { machines } = useDashboard();
+//   
+//   // Use WS-102 mock data as default
+//   const machine = machines.find(m => m.id === params.id) || machines[0];
+// 
+//   return (
+//     <div className="flex flex-col -mt-10 -mx-10 md:-mx-16">
+//       {/* TopAppBar */}
+//       <header className="sticky top-0 w-full z-40 bg-background flex justify-between items-center px-8 py-4">
+//         <div className="text-[32px] leading-[40px] font-[650] tracking-[-0.025em] text-primary">
+//           Predictive Ops
+//         </div>
+//         <nav className="hidden lg:flex items-center gap-8">
+//           <span className="text-primary font-bold border-b-2 border-primary pb-1 text-[12px] font-[500]">Main Plant</span>
+//           <span className="text-on-surface-variant opacity-80 pb-1 text-[12px] font-[500]">Shift B</span>
+//           <span className="text-on-surface-variant opacity-80 pb-1 text-[12px] font-[500] tabular-nums">14:20 UTC</span>
+//           <span className="text-on-surface-variant opacity-80 pb-1 text-[12px] font-[500] flex items-center gap-1">
+//             <span className="w-2 h-2 rounded-full bg-[#10b981]"></span> Connected
+//           </span>
+//         </nav>
+//         <div className="flex items-center gap-4 text-on-surface-variant">
+//           <button className="opacity-80 hover:opacity-100 transition-opacity hover:text-primary">
+//             <span className="material-symbols-outlined">notifications</span>
+//           </button>
+//         </div>
+//       </header>
+// 
+//       {/* Scrollable Page Content */}
+//       <div className="flex-1 p-4 md:p-8 lg:p-10">
+//         <div className="max-w-7xl mx-auto flex flex-col gap-8 pb-12">
+//           
+//           {/* CRITICAL BANNER */}
+//           <section className="bg-surface-container-lowest rounded-xl shadow-mega-soft border-l-[3px] border-l-error p-6 md:p-8 flex flex-col gap-6 relative overflow-hidden">
+//             <div className="flex flex-col md:flex-row justify-between md:items-start gap-4">
+//               <div className="flex flex-col gap-2">
+//                 <div className="flex items-center gap-3">
+//                   <span className="relative flex h-3 w-3">
+//                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-error opacity-75"></span>
+//                     <span className="relative inline-flex rounded-full h-3 w-3 bg-error"></span>
+//                   </span>
+//                   <h1 className="text-[14px] font-bold text-primary uppercase tracking-wide">FAILURE CASE FC-2024-0047</h1>
+//                   <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-[650] tracking-wider uppercase border border-amber-200">
+//                     IN PROGRESS
+//                   </span>
+//                 </div>
+//                 <p className="text-[14px] text-on-surface-variant font-medium">{machine.id} Ã¢â‚¬â€ {machine.name} Ã¢â‚¬â€ Line L-03</p>
+//                 <p className="text-[14px] text-on-surface-variant">
+//                   Predicted Failure: Servo Motor Bearing Ã‚Â· Part No: <span className="font-mono text-primary">BRG-10023</span>
+//                 </p>
+//               </div>
+//               <div className="flex flex-col items-end gap-2">
+//                 <span className="px-2.5 py-0.5 rounded-full bg-error text-on-error text-[11px] font-[650] tracking-wider uppercase">
+//                   CRITICAL
+//                 </span>
+//                 <span className="text-[12px] text-outline font-medium tabular-nums">Detected: 06-Aug 2026, 03:14 IST</span>
+//               </div>
+//             </div>
+//             
+//             <div className="flex flex-col gap-2 w-full max-w-2xl">
+//               <div className="flex justify-between text-[12px] font-bold">
+//                 <span className="text-error">Failure Probability</span>
+//                 <span className="text-error tabular-nums">92%</span>
+//               </div>
+//               <div className="w-full h-2 bg-surface-container rounded-full overflow-hidden">
+//                 <div className="h-full bg-error rounded-full transition-all duration-1000" style={{ width: '92%' }}></div>
+//               </div>
+//             </div>
+//           </section>
+// 
+//           {/* MAIN LAYOUT */}
+//           <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-8">
+//             
+//             {/* LEFT COLUMN: Stepper */}
+//             <aside className="bg-surface-container-lowest rounded-xl shadow-mega-soft border border-outline-variant/30 p-6">
+//               <h2 className="text-[14px] font-bold text-primary mb-6 uppercase tracking-wide border-b border-surface-container pb-3">Recovery Protocol</h2>
+//               <div className="relative flex flex-col gap-6">
+//                 {/* Connecting Line */}
+//                 <div className="absolute left-2.5 top-3 bottom-3 w-[2px] bg-surface-container -z-10"></div>
+//                 
+//                 {/* Step 1 (Done) */}
+//                 <div className="flex gap-4 items-start">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-primary">Failure Predicted</span>
+//                     <span className="text-[12px] text-outline tabular-nums">03:14 IST</span>
+//                   </div>
+//                 </div>
+//                 
+//                 {/* Step 2 (Done) */}
+//                 <div className="flex gap-4 items-start">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-primary">Stakeholders Alerted</span>
+//                     <span className="text-[12px] text-outline tabular-nums">03:14 IST</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 3 (Done) */}
+//                 <div className="flex gap-4 items-start">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-primary">WS Marked At Risk</span>
+//                     <span className="text-[12px] text-outline tabular-nums">03:14 IST</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 4 (Done) */}
+//                 <div className="flex gap-4 items-start">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-[#10b981] text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-primary">Allocation Blocked</span>
+//                     <span className="text-[12px] text-outline tabular-nums">03:15 IST</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 5 (Active) */}
+//                 <div 
+//                   className="flex gap-4 items-start relative cursor-pointer hover:bg-surface-container-low p-2 -ml-2 rounded-lg transition-colors"
+//                   onClick={() => router.push('/warehouse')}
+//                 >
+//                   <div className="absolute -left-1.5 -top-1.5 w-8 h-8 bg-amber-500/10 rounded-full animate-pulse -z-10"></div>
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5 border-2 border-surface-container-lowest flex items-center justify-center">
+//                     <span className="material-symbols-outlined text-amber-500 text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>radio_button_checked</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-bold text-primary">Warehouse Check</span>
+//                     <span className="text-[12px] text-amber-600 font-medium uppercase tracking-wider mt-0.5">Click to resolve</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 6 (Pending) */}
+//                 <div className="flex gap-4 items-start opacity-50">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-outline text-[20px]">radio_button_unchecked</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-on-surface">Procurement</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 7 (Pending) */}
+//                 <div className="flex gap-4 items-start opacity-50">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-outline text-[20px]">radio_button_unchecked</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-on-surface">Maintenance WO</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 8 (Pending) */}
+//                 <div className="flex gap-4 items-start opacity-50">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-outline text-[20px]">radio_button_unchecked</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-on-surface">Jobs Rerouted</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 9 (Pending) */}
+//                 <div className="flex gap-4 items-start opacity-50">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-outline text-[20px]">radio_button_unchecked</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-on-surface">Shipment Impact</span>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Step 10 (Pending) */}
+//                 <div className="flex gap-4 items-start opacity-50">
+//                   <div className="bg-surface-container-lowest rounded-full mt-0.5">
+//                     <span className="material-symbols-outlined text-outline text-[20px]">radio_button_unchecked</span>
+//                   </div>
+//                   <div className="flex flex-col">
+//                     <span className="text-[14px] font-medium text-on-surface">Recovery ETA</span>
+//                   </div>
+//                 </div>
+//               </div>
+// 
+//               {/* Alert Actions */}
+//               <div className="flex justify-end pt-4 mt-4 border-t border-error/20">
+//                 <button 
+//                   onClick={() => setAcknowledged(true)}
+//                   disabled={acknowledged}
+//                   className={`px-6 py-2 rounded-full font-bold transition-colors ${
+//                     acknowledged 
+//                       ? 'bg-error/10 text-error cursor-default' 
+//                       : 'bg-error text-white hover:bg-error/90'
+//                   }`}
+//                 >
+//                   {acknowledged ? 'Alert Acknowledged' : 'Acknowledge Alert'}
+//                 </button>
+//               </div>
+//             </aside>
+// 
+//             {/* RIGHT COLUMN: Grid & Table */}
+//             <div className="flex flex-col gap-8">
+//               
+//               {/* 2x3 Grid */}
+//               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//                 
+//                 {/* Card 1: Prediction Summary */}
+//                 <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-mega-soft flex flex-col gap-4">
+//                   <h3 className="text-[11px] font-[650] tracking-wider uppercase text-outline flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[16px]">analytics</span> Prediction Summary
+//                   </h3>
+//                   <div className="flex flex-col gap-3 flex-1">
+//                     <div className="flex justify-between items-end border-b border-surface-container pb-2">
+//                       <span className="text-[12px] text-on-surface-variant">Component</span>
+//                       <span className="text-[14px] font-medium text-primary text-right">Servo Motor Bearing</span>
+//                     </div>
+//                     <div className="flex justify-between items-end border-b border-surface-container pb-2">
+//                       <span className="text-[12px] text-on-surface-variant">Confidence</span>
+//                       <span className="text-[14px] font-medium text-error tabular-nums">92%</span>
+//                     </div>
+//                     <div className="flex justify-between items-end border-b border-surface-container pb-2">
+//                       <span className="text-[12px] text-on-surface-variant">Time to Failure (TTF)</span>
+//                       <span className="text-[14px] font-bold text-primary tabular-nums">18h</span>
+//                     </div>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Card 2: Workstation Control */}
+//                 <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-mega-soft flex flex-col gap-4 relative overflow-hidden">
+//                   <div className="absolute inset-0 bg-error/5 pointer-events-none"></div>
+//                   <h3 className="text-[11px] font-[650] tracking-wider uppercase text-outline flex items-center gap-2 relative z-10">
+//                     <span className="material-symbols-outlined text-[16px]">precision_manufacturing</span> Workstation Control
+//                   </h3>
+//                   <div className="flex flex-col gap-4 flex-1 relative z-10">
+//                     <div className="flex justify-between items-center bg-surface-bright p-2.5 rounded-lg border border-surface-container">
+//                       <span className="text-[12px] text-on-surface-variant font-medium">Status</span>
+//                       <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-error text-on-error uppercase tracking-wider">AT RISK</span>
+//                     </div>
+//                     <div className="flex justify-between items-center bg-surface-bright p-2.5 rounded-lg border border-surface-container">
+//                       <span className="text-[12px] text-on-surface-variant font-medium">Allocation</span>
+//                       <span className="text-[12px] font-bold text-primary uppercase">BLOCKED</span>
+//                     </div>
+//                     <div className="flex flex-col gap-1 mt-auto">
+//                       <span className="text-[11px] text-outline uppercase tracking-wide">Op State</span>
+//                       <span className="text-[13px] font-bold text-primary">CONTROLLED SHUTDOWN PENDING</span>
+//                     </div>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Card 3: Notification Status */}
+//                 <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-mega-soft flex flex-col gap-4">
+//                   <h3 className="text-[11px] font-[650] tracking-wider uppercase text-outline flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[16px]">campaign</span> Notification Status
+//                   </h3>
+//                   <div className="flex flex-col gap-3">
+//                     <div className="flex items-center justify-between group">
+//                       <div className="flex items-center gap-2">
+//                         <span className="material-symbols-outlined text-[#10b981] text-[16px]">check</span>
+//                         <span className="text-[13px] text-primary">Maintenance Team</span>
+//                       </div>
+//                       <span className="text-[11px] text-outline tabular-nums">03:14:02</span>
+//                     </div>
+//                     <div className="flex items-center justify-between group">
+//                       <div className="flex items-center gap-2">
+//                         <span className="material-symbols-outlined text-[#10b981] text-[16px]">check</span>
+//                         <span className="text-[13px] text-primary">Production Control</span>
+//                       </div>
+//                       <span className="text-[11px] text-outline tabular-nums">03:14:05</span>
+//                     </div>
+//                     <div className="flex items-center justify-between group">
+//                       <div className="flex items-center gap-2">
+//                         <span className="material-symbols-outlined text-[#10b981] text-[16px]">check</span>
+//                         <span className="text-[13px] text-primary">Logistics Desk</span>
+//                       </div>
+//                       <span className="text-[11px] text-outline tabular-nums">03:14:10</span>
+//                     </div>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Card 4: Inventory Check */}
+//                 <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-mega-soft flex flex-col gap-4">
+//                   <h3 className="text-[11px] font-[650] tracking-wider uppercase text-outline flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[16px]">inventory_2</span> Inventory Check
+//                   </h3>
+//                   <div className="flex flex-col gap-4 flex-1">
+//                     <div className="flex flex-col">
+//                       <span className="text-[12px] text-outline">Target Part</span>
+//                       <span className="text-[14px] font-mono font-medium text-primary">BRG-10023</span>
+//                     </div>
+//                     <div className="grid grid-cols-2 gap-2 mt-auto">
+//                       <div className="bg-surface-container-low p-2 rounded border border-surface-container">
+//                         <span className="block text-[11px] text-outline uppercase tracking-wider mb-1">Stock</span>
+//                         <span className="block text-[16px] font-bold text-primary tabular-nums leading-none">3</span>
+//                       </div>
+//                       <div className="bg-surface-container-low p-2 rounded border border-surface-container">
+//                         <span className="block text-[11px] text-outline uppercase tracking-wider mb-1">Reserved</span>
+//                         <span className="block text-[16px] font-bold text-on-surface-variant tabular-nums leading-none">1</span>
+//                       </div>
+//                     </div>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Card 5: Rerouting Status */}
+//                 <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-mega-soft flex flex-col gap-4">
+//                   <h3 className="text-[11px] font-[650] tracking-wider uppercase text-outline flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[16px]">alt_route</span> Rerouting Status
+//                   </h3>
+//                   <div className="flex flex-col gap-2">
+//                     <div className="flex justify-between items-center p-2 hover:bg-surface-container-low rounded transition-colors cursor-pointer border border-transparent hover:border-surface-container" onClick={() => router.push('/rerouting')}>
+//                       <span className="font-mono text-[13px] text-primary font-medium">J-8812</span>
+//                       <span className="text-[11px] font-[600] text-outline uppercase tracking-wider bg-surface-container px-1.5 py-0.5 rounded text-primary">Resolve Ã¢â€ â€™</span>
+//                     </div>
+//                     <div className="flex justify-between items-center p-2 hover:bg-surface-container-low rounded transition-colors cursor-pointer border border-transparent hover:border-surface-container" onClick={() => router.push('/rerouting')}>
+//                       <span className="font-mono text-[13px] text-primary font-medium">J-8813</span>
+//                       <span className="text-[11px] font-[600] text-outline uppercase tracking-wider bg-surface-container px-1.5 py-0.5 rounded text-primary">Resolve Ã¢â€ â€™</span>
+//                     </div>
+//                   </div>
+//                 </div>
+// 
+//                 {/* Card 6: Recovery Estimate */}
+//                 <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-5 shadow-mega-soft flex flex-col gap-4">
+//                   <h3 className="text-[11px] font-[650] tracking-wider uppercase text-outline flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[16px]">build</span> Recovery Estimate
+//                   </h3>
+//                   <div className="flex flex-col gap-4 flex-1">
+//                     <div>
+//                       <span className="block text-[11px] text-outline uppercase tracking-wider mb-1">Scenario</span>
+//                       <span className="block text-[13px] font-medium text-primary">Routine Bearing Swap</span>
+//                     </div>
+//                     <div className="flex justify-between items-end mt-auto pt-4 border-t border-surface-container">
+//                       <span className="text-[12px] font-bold text-primary uppercase tracking-wide">Total ETA</span>
+//                       <span className="text-[18px] font-black text-primary tabular-nums leading-none">6 Hours</span>
+//                     </div>
+//                   </div>
+//                 </div>
+// 
+//               </div>
+// 
+//               {/* Mini Table: Shipment Impact */}
+//               <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl shadow-mega-soft overflow-hidden mt-4">
+//                 <div className="px-5 py-4 border-b border-surface-container bg-surface-bright flex justify-between items-center">
+//                   <h3 className="text-[12px] font-bold text-primary uppercase tracking-wide flex items-center gap-2">
+//                     <span className="material-symbols-outlined text-[18px]">local_shipping</span> Shipment Impact
+//                   </h3>
+//                 </div>
+//                 <div className="overflow-x-auto">
+//                   <table className="w-full text-left border-collapse">
+//                     <thead>
+//                       <tr className="bg-surface-container-lowest border-b border-surface-container text-[11px] font-[650] text-outline uppercase tracking-wider">
+//                         <th className="px-5 py-3 font-medium">PO Number</th>
+//                         <th className="px-5 py-3 font-medium">Client</th>
+//                         <th className="px-5 py-3 font-medium">Original ETA</th>
+//                         <th className="px-5 py-3 font-medium text-right">Risk Level</th>
+//                       </tr>
+//                     </thead>
+//                     <tbody className="text-[13px] text-on-surface">
+//                       <tr className="border-b border-surface-container hover:bg-surface-container-low transition-colors">
+//                         <td className="px-5 py-3 font-mono font-medium text-primary">PO-8839</td>
+//                         <td className="px-5 py-3">EuroTech Industrial</td>
+//                         <td className="px-5 py-3 tabular-nums text-on-surface-variant">08-Aug, 12:00</td>
+//                         <td className="px-5 py-3 text-right">
+//                           <button 
+//                             onClick={() => setProposalAccepted(true)}
+//                             disabled={proposalAccepted}
+//                             className={`px-6 py-3 rounded-full font-bold transition-colors ${
+//                               proposalAccepted
+//                                 ? 'bg-[#10b981]/20 text-[#10b981] cursor-default'
+//                                 : 'bg-primary text-on-primary hover:opacity-90'
+//                             }`}
+//                           >
+//                             {proposalAccepted ? 'Action Accepted' : 'Accept & Execute'}
+//                           </button>
+//                         </td>
+//                       </tr>
+//                     </tbody>
+//                   </table>
+//                 </div>
+//               </div>
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+// 
+// 
+// 

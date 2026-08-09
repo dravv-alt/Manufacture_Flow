@@ -1,0 +1,6 @@
+// ACTIVE DASHBOARD ROUTE V1 — preserved before the dedicated digital-twin workspace implementation.
+// import { CommandCenter } from "@/components/CommandCenter";
+//
+// export default function DashboardPage() {
+//   return <CommandCenter view="dashboard" />;
+// }

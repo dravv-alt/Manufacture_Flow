@@ -1,0 +1,11 @@
+Model Information:
+* title:	Industrial Conveyor Belt
+* source:	https://sketchfab.com/3d-models/industrial-conveyor-belt-a3c3b8a28e004ad7bc97ac84f4a12fee
+* author:	Juan Sebastian Solano (https://sketchfab.com/Juan.Sebastian.Solano)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Industrial Conveyor Belt" (https://sketchfab.com/3d-models/industrial-conveyor-belt-a3c3b8a28e004ad7bc97ac84f4a12fee) by Juan Sebastian Solano (https://sketchfab.com/Juan.Sebastian.Solano) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

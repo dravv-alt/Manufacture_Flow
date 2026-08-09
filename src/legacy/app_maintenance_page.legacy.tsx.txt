@@ -1,0 +1,256 @@
+// LEGACY ROUTE — preserved before replacement.
+// "use client";
+// 
+// import React from 'react';
+// 
+// export default function MaintenancePage() {
+//   return (
+//     <div className="flex flex-col -mt-10 -mx-10 md:-mx-16">
+//       {/* Top Nav (Desktop) */}
+//       <header className="w-full h-16 bg-transparent flex justify-between items-center mb-8 hidden md:flex pl-8 pr-8 mt-4">
+//         <div className="flex items-center gap-6">
+//           <span className="text-[20px] font-[600] text-primary">Industrial Serenity</span>
+//           <div className="h-6 w-px bg-surface-variant"></div>
+//           <nav className="flex gap-6">
+//             <span className="text-on-surface-variant pb-1 hover:text-primary transition-colors text-sm font-medium">Mumbai Plant</span>
+//             <span className="text-on-surface-variant pb-1 hover:text-primary transition-colors text-sm font-medium">Systems Online</span>
+//           </nav>
+//         </div>
+//         <div className="flex items-center gap-4">
+//           <div className="relative bg-surface-container-low rounded-full px-4 py-2 flex items-center gap-2 shadow-inner w-64">
+//             <span className="material-symbols-outlined text-on-surface-variant text-sm">search</span>
+//             <input className="bg-transparent border-none focus:ring-0 text-sm w-full placeholder:text-on-surface-variant text-on-surface outline-none" placeholder="Search operations..." type="text"/>
+//           </div>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">notifications</span></button>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">settings</span></button>
+//           <button className="p-2 text-on-surface-variant hover:text-primary transition-colors opacity-80 active:opacity-100"><span className="material-symbols-outlined">help</span></button>
+//         </div>
+//       </header>
+//       
+//       <div className="flex-1 px-4 md:px-8 lg:px-12 pb-12">
+//         <div className="max-w-6xl mx-auto space-y-6">
+//           
+//           {/* SECTION 1: WORK ORDER */}
+//           <section className="bg-surface-container-lowest rounded-2xl border border-surface-variant border-l-[3px] border-l-[#3b82f6] p-8 shadow-sm relative">
+//             <div className="flex justify-between items-start mb-6">
+//               <h2 className="text-[11px] font-bold uppercase tracking-widest text-primary">MAINTENANCE WORK ORDER</h2>
+//               <span className="font-mono text-[14px] font-bold text-primary">WO-2024-0312</span>
+//             </div>
+//             
+//             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6 text-sm">
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Failure Case</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">FC-2024-0047</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Machine</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">WS-102</p>
+//               </div>
+//               <div className="col-span-2">
+//                 <p className="text-on-surface-variant text-xs mb-1">Predicted Fault</p>
+//                 <p className="font-medium text-primary">Servo Motor Bearing Degradation</p>
+//               </div>
+//               
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Required Part</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">BRG-10023</p>
+//               </div>
+//               <div>
+//                 <p className="text-on-surface-variant text-xs mb-1">Planned Repair</p>
+//                 <p className="font-mono text-[13px] font-medium text-primary">06-Aug 2026</p>
+//               </div>
+//               <div className="col-span-2">
+//                 <p className="text-on-surface-variant text-xs mb-1">Part Availability</p>
+//                 <p className="font-medium text-[#10b981]">Reserved in Warehouse</p>
+//               </div>
+//             </div>
+//             
+//             <div className="flex items-center gap-3">
+//               <span className="px-2 py-0.5 rounded-full bg-[#ba1a1a]/10 text-[#ba1a1a] text-[10px] font-bold tracking-wider border border-[#ba1a1a]/20 uppercase">
+//                 CRITICAL
+//               </span>
+//               <span className="px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant text-[10px] font-bold tracking-wider uppercase">
+//                 SCHEDULED
+//               </span>
+//             </div>
+//           </section>
+//           
+//           {/* SECTION 2: HORIZONTAL STEPPER */}
+//           <section className="bg-surface-container-lowest rounded-2xl border border-surface-variant p-8 shadow-sm">
+//             <h3 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant mb-8">REPAIR WORKFLOW</h3>
+//             
+//             <div className="relative flex justify-between items-center w-full max-w-4xl mx-auto px-4">
+//               {/* Background Line */}
+//               <div className="absolute top-[9px] left-0 right-0 h-[2px] bg-surface-variant -z-10 mx-8"></div>
+//               {/* Progress Line */}
+//               <div className="absolute top-[9px] left-0 h-[2px] bg-[#f59e0b] -z-10 mx-8" style={{ width: '33%' }}></div>
+//               
+//               {/* Stage 1: WO Created */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-[#10b981] flex items-center justify-center border-2 border-surface-container-lowest ring-2 ring-[#10b981]/20">
+//                   <span className="material-symbols-outlined text-white text-[12px] font-bold">check</span>
+//                 </div>
+//                 <span className="text-[11px] font-medium text-primary text-center leading-tight">WO Created</span>
+//               </div>
+//               
+//               {/* Stage 2: Waiting for Part */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-[#10b981] flex items-center justify-center border-2 border-surface-container-lowest ring-2 ring-[#10b981]/20">
+//                   <span className="material-symbols-outlined text-white text-[12px] font-bold">check</span>
+//                 </div>
+//                 <span className="text-[11px] font-medium text-primary text-center leading-tight">Waiting for Part</span>
+//               </div>
+//               
+//               {/* Stage 3: Repair Planned (Current) */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-[#f59e0b] flex items-center justify-center border-2 border-surface-container-lowest ring-[4px] ring-[#f59e0b]/30 animate-pulse">
+//                 </div>
+//                 <span className="text-[11px] font-bold text-primary text-center leading-tight">Repair Planned</span>
+//               </div>
+//               
+//               {/* Stage 4: Part Installed */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-surface-container-lowest border-2 border-surface-variant">
+//                 </div>
+//                 <span className="text-[11px] font-medium text-on-surface-variant text-center leading-tight">Part Installed</span>
+//               </div>
+//               
+//               {/* Stage 5: Testing */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-surface-container-lowest border-2 border-surface-variant">
+//                 </div>
+//                 <span className="text-[11px] font-medium text-on-surface-variant text-center leading-tight">Testing</span>
+//               </div>
+//               
+//               {/* Stage 6: Quality Validation */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-surface-container-lowest border-2 border-surface-variant">
+//                 </div>
+//                 <span className="text-[11px] font-medium text-on-surface-variant text-center leading-tight">Quality Validation</span>
+//               </div>
+//               
+//               {/* Stage 7: Returned to Service */}
+//               <div className="flex flex-col items-center gap-3 z-10 w-24">
+//                 <div className="w-[20px] h-[20px] rounded-full bg-surface-container-lowest border-2 border-surface-variant">
+//                 </div>
+//                 <span className="text-[11px] font-medium text-on-surface-variant text-center leading-tight">Returned to Service</span>
+//               </div>
+//             </div>
+//           </section>
+//           
+//           {/* SECTION 3: RECOVERY SCENARIOS */}
+//           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//             
+//             {/* LEFT: Scenario 1 (Active) */}
+//             <section className="bg-surface-container-lowest rounded-2xl border-2 border-[#10b981] p-6 shadow-sm relative">
+//               <div className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-[#10b981]/10 text-[#10b981] text-[10px] font-bold tracking-wider uppercase border border-[#10b981]/20">
+//                 CURRENTLY ACTIVE
+//               </div>
+//               <h3 className="text-[12px] font-bold uppercase tracking-widest text-primary mb-6">Scenario 1: Spare in Warehouse</h3>
+//               
+//               <div className="space-y-3 mb-6">
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Part Installation</span>
+//                   <span className="font-mono text-[13px] font-medium text-primary">3 Hours</span>
+//                 </div>
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Testing</span>
+//                   <span className="font-mono text-[13px] font-medium text-primary">2 Hours</span>
+//                 </div>
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Quality Validation</span>
+//                   <span className="font-mono text-[13px] font-medium text-primary">1 Hour</span>
+//                 </div>
+//               </div>
+//               
+//               <div className="flex justify-between items-center border-t-2 border-primary pt-4 mb-6">
+//                 <span className="text-[13px] font-bold uppercase tracking-wider text-primary">TOTAL RECOVERY</span>
+//                 <span className="text-[18px] font-bold font-mono text-primary">6 HOURS</span>
+//               </div>
+//               
+//               <div className="bg-surface-container-low rounded-lg p-3 border border-surface-variant flex items-center justify-between">
+//                 <span className="text-xs text-on-surface-variant">Expected Recovery:</span>
+//                 <span className="font-mono text-[13px] font-bold text-primary">06-Aug 2026, 09:14 IST</span>
+//               </div>
+//             </section>
+//             
+//             {/* RIGHT: Scenario 2 (Dimmed) */}
+//             <section className="bg-surface-container-lowest rounded-2xl border-2 border-dashed border-[#cfc4c5] p-6 relative opacity-60">
+//               <div className="absolute top-4 right-4 px-2 py-0.5 rounded-full bg-surface-variant text-on-surface-variant text-[10px] font-bold tracking-wider uppercase">
+//                 WOULD APPLY IF UNAVAILABLE
+//               </div>
+//               <h3 className="text-[12px] font-bold uppercase tracking-widest text-on-surface-variant mb-6">Scenario 2: Spare from Vendor</h3>
+//               
+//               <div className="space-y-3 mb-6">
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Vendor Delivery</span>
+//                   <span className="font-mono text-[13px] text-on-surface-variant">2 Days</span>
+//                 </div>
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Parts Inspection</span>
+//                   <span className="font-mono text-[13px] text-on-surface-variant">4 Hours</span>
+//                 </div>
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Repair</span>
+//                   <span className="font-mono text-[13px] text-on-surface-variant">6 Hours</span>
+//                 </div>
+//                 <div className="flex justify-between items-center text-sm border-b border-surface-variant/50 pb-2">
+//                   <span className="text-on-surface-variant">Testing</span>
+//                   <span className="font-mono text-[13px] text-on-surface-variant">2 Hours</span>
+//                 </div>
+//               </div>
+//               
+//               <div className="flex justify-between items-center border-t border-surface-variant pt-4 mb-6">
+//                 <span className="text-[13px] font-bold uppercase tracking-wider text-on-surface-variant">TOTAL</span>
+//                 <span className="text-[16px] font-bold font-mono text-on-surface-variant">2.5 DAYS</span>
+//               </div>
+//               
+//               <div className="bg-surface-container-low rounded-lg p-3 border border-surface-variant flex items-center justify-between">
+//                 <span className="text-xs text-on-surface-variant">Would Recover:</span>
+//                 <span className="font-mono text-[13px] font-medium text-on-surface-variant">08-Aug 2026, 15:14 IST</span>
+//               </div>
+//             </section>
+//             
+//           </div>
+//           
+//           {/* SECTION 4: OUTPUT SUMMARY */}
+//           <section className="bg-surface-container-lowest rounded-2xl border border-surface-variant border-l-[3px] border-l-[#0d9488] p-6 shadow-sm flex items-center justify-between flex-wrap gap-4">
+//             <div className="flex items-center gap-4">
+//               <span className="px-2 py-0.5 rounded-full bg-[#10b981]/10 text-[#10b981] text-[10px] font-bold tracking-wider border border-[#10b981]/20 uppercase">
+//                 PUBLISHED
+//               </span>
+//               <h2 className="text-[12px] font-bold uppercase tracking-widest text-primary">MACHINE AVAILABILITY ESTIMATE</h2>
+//             </div>
+//             
+//             <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+//               <div className="flex items-center gap-2">
+//                 <span className="text-on-surface-variant text-xs">Date:</span>
+//                 <span className="font-mono text-[13px] font-bold text-primary">06-Aug 2026</span>
+//               </div>
+//               <div className="flex items-center gap-2">
+//                 <span className="text-on-surface-variant text-xs">Time:</span>
+//                 <span className="font-mono text-[13px] font-bold text-primary">09:14 IST</span>
+//               </div>
+//               <div className="flex items-center gap-2 hidden md:flex">
+//                 <span className="text-on-surface-variant text-xs">Scenario:</span>
+//                 <span className="font-medium text-primary">Spare Available</span>
+//               </div>
+//               <div className="flex items-center gap-2 hidden lg:flex">
+//                 <span className="text-on-surface-variant text-xs">Downtime:</span>
+//                 <span className="font-mono text-[13px] font-bold text-primary">6 Hours</span>
+//               </div>
+//             </div>
+//             
+//             <span className="px-2 py-0.5 rounded-full bg-[#f59e0b]/10 text-[#f59e0b] text-[10px] font-bold tracking-wider border border-[#f59e0b]/20 uppercase">
+//               REPAIR IN PROGRESS
+//             </span>
+//           </section>
+// 
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+// 
+// 
+// 
