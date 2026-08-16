@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AppShell from "@/components/AppShell";
-import { DashboardProvider } from "@/contexts/DashboardContext";
+import { OperationsProvider } from "@/contexts/OperationsContext";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Manrope } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { WorkflowTabs } from "@/components/WorkflowTabs";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -44,9 +45,9 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
       </head>
       <body>
-        <DashboardProvider>
-          <AppShell>{children}</AppShell>
-        </DashboardProvider>
+        <OperationsProvider>
+          <AppShell><WorkflowTabs />{children}</AppShell>
+        </OperationsProvider>
       </body>
     </html>
   );

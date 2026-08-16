@@ -1,70 +1,70 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Check, Clock3, Factory, PackageCheck, ShieldCheck, UserRound, Wrench } from "lucide-react";
+import { useMemo } from "react";
+import { Check, CircleGauge, Clock3, Factory, PackageCheck, ShieldCheck, UserRound, Wrench } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { demoMaintenanceStages, demoRecoveryScenarios, type RecoveryScenarioId } from "@/demo-data/ws102-scenario";
+import { useOperations } from "@/contexts/OperationsContext";
 import { cn } from "@/lib/utils";
 
-type Scenario = "local" | "vendor";
-
-// demo_data
-const scenarios = {
-  local: {
-    label: "Scenario 1 / local bearing available",
-    availability: "10-Aug-2026 / 06:45 IST",
-    total: "6h 15m",
-    steps: [
-      ["Part transfer", "45m"],
-      ["Bearing replacement", "2h 30m"],
-      ["Testing", "1h 30m"],
-      ["Quality validation", "1h 30m"],
-    ],
-  },
-  vendor: {
-    label: "Scenario 2 / vendor replenishment required",
-    availability: "12-Aug-2026 / 20:30 IST",
-    total: "60h",
-    steps: [
-      ["Vendor lead time", "36h"],
-      ["Transportation + inspection", "12h"],
-      ["Bearing replacement", "6h"],
-      ["Testing + quality validation", "6h"],
-    ],
-  },
-} as const;
-
-const stages = ["Created", "Waiting for part", "Planned", "Installed", "Testing", "Validation", "Returned to service"] as const;
-
 export function MaintenanceControl() {
-  const [scenario, setScenario] = useState<Scenario>("local");
-  const [stageIndex, setStageIndex] = useState(2);
-  const [assignee, setAssignee] = useState("A. Kulkarni / Maintenance Lead");
-  const selected = scenarios[scenario];
+  // REDUNDANT LOCAL STATE — retained for review; maintenance state now persists in OperationsContext.
+  // const [scenario, setScenario] = useState<RecoveryScenarioId>("local");
+  // const [stageIndex, setStageIndex] = useState(2);
+  // const [assignee, setAssignee] = useState("A. Kulkarni / Maintenance Lead");
+  const { state, update } = useOperations();
+  const scenario = state.recoveryScenario;
+  const stageIndex = state.maintenanceStage;
+  const assignee = state.maintenanceAssignee;
+  const setScenario = (recoveryScenario: RecoveryScenarioId) => update({ recoveryScenario });
+  const setStageIndex = (next: number | ((value: number) => number)) => update({ maintenanceStage: typeof next === "function" ? next(stageIndex) : next });
+  const setAssignee = (next: string | ((value: string) => string)) => update({ maintenanceAssignee: typeof next === "function" ? next(assignee) : next });
+  const selected = demoRecoveryScenarios[scenario];
   const audit = useMemo(() => [
-    "03:14 IST · Failure case FC-2024-0047 created",
+    "03:14 IST · Failure case FC-2026-0047 created",
     "03:15 IST · WS-102 allocation blocked",
     "03:21 IST · BRG-10023 requirement linked",
     "03:32 IST · Work order planned by " + assignee,
   ], [assignee]);
 
-  const advance = () => setStageIndex((value) => Math.min(value + 1, stages.length - 1));
+  const advance = () => update({ maintenanceStage: Math.min(stageIndex + 1, demoMaintenanceStages.length - 1) });
 
   return (
     <main className="px-5 py-7 md:px-8 md:py-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="flex flex-col gap-5 border-b border-border pb-7">
           <div className="flex flex-wrap items-center gap-3"><Badge variant="outline">DEMO DATA</Badge><span className="font-mono text-xs text-muted-foreground">MAINTENANCE CONTROL / WO-WS102-081</span></div>
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Recover WS-102 with visible assumptions.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">The work order links failure evidence, BRG-10023 availability, repair stages, and a deterministic return-to-service estimate.</p></div><Button onClick={advance} disabled={stageIndex === stages.length - 1}>{stageIndex === stages.length - 1 ? <Check data-icon="inline-start" /> : <Wrench data-icon="inline-start" />}{stageIndex === stages.length - 1 ? "Returned to service" : "Advance work order stage"}</Button></div>
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Recover WS-102 with visible assumptions.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">The work order links failure evidence, BRG-10023 availability, repair stages, and a deterministic return-to-service estimate.</p></div><Button onClick={advance} disabled={stageIndex === demoMaintenanceStages.length - 1}>{stageIndex === demoMaintenanceStages.length - 1 ? <Check data-icon="inline-start" /> : <Wrench data-icon="inline-start" />}{stageIndex === demoMaintenanceStages.length - 1 ? "Returned to service" : "Advance work order stage"}</Button></div>
+        </section>
+
+        <RecoveryCommandCenter stageIndex={stageIndex} scenario={scenario} availability={selected.availability} total={selected.total} onSelectStage={setStageIndex} />
+
+        <UptimeSignal stageIndex={stageIndex} />
+
+        <section className="grid gap-5 xl:grid-cols-[1.45fr_0.7fr]">
+          <Card className="relative overflow-hidden border-0 bg-[#252423] text-[#faf7f3] shadow-[0_22px_40px_rgba(0,0,0,0.11)]">
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div><CardDescription className="font-mono text-[10px] tracking-widest text-white/55">EXPECTED MACHINE AVAILABILITY</CardDescription><CardTitle className="mt-2 font-heading text-4xl tracking-[-0.04em] text-white md:text-6xl">{selected.availability}</CardTitle></div>
+                <Badge variant="destructive">WS-102 DOWN</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2"><RecoveryFact dark label="Predicted fault" value="X-Axis Servo Motor Bearing" /><RecoveryFact dark label="Required part" value="BRG-10023 / quantity 1" /></CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="font-heading">Maintenance priority</CardTitle><CardDescription>Work-order decision context.</CardDescription></CardHeader>
+            <CardContent className="flex flex-col gap-4"><RecoveryRow label="Priority" value="High" tone="destructive" /><RecoveryRow label="Repair status" value={demoMaintenanceStages[stageIndex]} tone="warning" /><RecoveryRow label="Part availability" value={scenario === "local" ? "Warehouse reserved" : "In transit"} tone="success" /></CardContent>
+          </Card>
         </section>
 
         <section className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
           <Card><CardHeader><CardTitle className="font-heading">Work order</CardTitle><CardDescription>Authorized maintenance record for the controlled scenario.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><Detail icon={Factory} label="Workstation" value="WS-102 / Haas VF-2SS CNC" /><Detail icon={Wrench} label="Predicted fault" value="X-Axis Servo Motor Bearing" /><Detail icon={PackageCheck} label="Required part" value="BRG-10023 / quantity 1" /><Detail icon={UserRound} label="Assignee" value={assignee} /><Button variant="outline" onClick={() => setAssignee((value) => value.startsWith("A.") ? "R. Shah / Reliability Technician" : "A. Kulkarni / Maintenance Lead")}>Change assignee</Button></CardContent></Card>
-          <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="font-heading">Recovery lifecycle</CardTitle><CardDescription>Current state: {stages[stageIndex]}</CardDescription></div><Badge variant="secondary">{stages[stageIndex].toUpperCase()}</Badge></div></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{stages.map((stage, index) => <button key={stage} onClick={() => setStageIndex(index)} className={cn("flex items-center gap-3 rounded-md border p-3 text-left", index === stageIndex ? "border-primary bg-primary text-primary-foreground" : index < stageIndex ? "border-border bg-muted" : "border-border")}><span className={cn("flex size-6 items-center justify-center rounded-full font-mono text-xs", index <= stageIndex ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground")}>{index < stageIndex ? <Check className="size-3" /> : index + 1}</span><span className="text-sm font-medium">{stage}</span></button>)}</CardContent></Card>
+          <Card><CardHeader><div className="flex flex-wrap items-start justify-between gap-3"><div><CardTitle className="font-heading">Recovery lifecycle</CardTitle><CardDescription>Current state: {demoMaintenanceStages[stageIndex]}</CardDescription></div><Badge variant="secondary">{demoMaintenanceStages[stageIndex].toUpperCase()}</Badge></div></CardHeader><CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{demoMaintenanceStages.map((stage, index) => <button key={stage} onClick={() => setStageIndex(index)} className={cn("flex items-center gap-3 rounded-md border p-3 text-left", index === stageIndex ? "border-primary bg-primary text-primary-foreground" : index < stageIndex ? "border-border bg-muted" : "border-border")}><span className={cn("flex size-6 items-center justify-center rounded-full font-mono text-xs", index <= stageIndex ? "bg-primary-foreground text-primary" : "bg-muted text-muted-foreground")}>{index < stageIndex ? <Check className="size-3" /> : index + 1}</span><span className="text-sm font-medium">{stage}</span></button>)}</CardContent></Card>
         </section>
 
-        <Card><CardHeader><CardTitle className="font-heading">Recovery scenario calculation</CardTitle><CardDescription>Select the supply condition; the duration breakdown and availability estimate update deterministically.</CardDescription></CardHeader><CardContent className="flex flex-col gap-5"><div className="grid gap-3 md:grid-cols-2">{(["local", "vendor"] as Scenario[]).map((option) => <button key={option} onClick={() => setScenario(option)} className={cn("rounded-md border p-4 text-left", scenario === option ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}><p className="font-mono text-xs">{scenarios[option].label.toUpperCase()}</p><p className="mt-2 text-sm">{option === "local" ? "Use warehouse-reserved BRG-10023." : "Use vendor lead time, delivery, and inspection."}</p></button>)}</div><div className="grid gap-4 md:grid-cols-[1fr_1fr_0.7fr]"><div className="rounded-md bg-muted p-4"><p className="text-xs text-muted-foreground">Expected availability</p><p className="mt-2 font-mono text-sm font-semibold">{selected.availability}</p></div><div className="rounded-md bg-muted p-4"><p className="text-xs text-muted-foreground">Scenario used</p><p className="mt-2 text-sm font-semibold">{selected.label}</p></div><div className="rounded-md border border-border p-4"><p className="text-xs text-muted-foreground">Total duration</p><p className="mt-2 font-mono text-2xl font-semibold">{selected.total}</p></div></div><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">{selected.steps.map(([label, duration]) => <div key={label} className="rounded-md border border-border p-4"><p className="text-sm">{label}</p><p className="mt-2 font-mono text-sm text-muted-foreground">{duration}</p></div>)}</div></CardContent></Card>
+        <Card><CardHeader><div className="flex flex-wrap items-end justify-between gap-4"><div><CardTitle className="font-heading">Recovery calculation</CardTitle><CardDescription>Select the supply condition; the duration breakdown and availability estimate update deterministically.</CardDescription></div><div className="text-right"><p className="font-mono text-[10px] tracking-widest text-muted-foreground">TOTAL RECOVERY TIME</p><p className="font-heading text-3xl">{selected.total}</p></div></div></CardHeader><CardContent className="flex flex-col gap-5"><div className="grid gap-3 md:grid-cols-2">{(["local", "vendor"] as RecoveryScenarioId[]).map((option) => <button key={option} onClick={() => setScenario(option)} className={cn("rounded-xl border p-4 text-left", scenario === option ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}><p className="font-mono text-xs">{demoRecoveryScenarios[option].label.toUpperCase()}</p><p className="mt-2 text-sm">{option === "local" ? "Use warehouse-reserved BRG-10023." : "Use vendor lead time, delivery, and inspection."}</p></button>)}</div><div className="h-4 overflow-hidden rounded-full bg-muted" aria-label="Recovery stage progress"><div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${Math.max(10, ((stageIndex + 1) / demoMaintenanceStages.length) * 100)}%` }} /></div><div className="grid gap-4 md:grid-cols-[1fr_1fr_0.7fr]"><div className="rounded-md bg-muted p-4"><p className="text-xs text-muted-foreground">Expected availability</p><p className="mt-2 font-mono text-sm font-semibold">{selected.availability}</p></div><div className="rounded-md bg-muted p-4"><p className="text-xs text-muted-foreground">Scenario used</p><p className="mt-2 text-sm font-semibold">{selected.label}</p></div><div className="rounded-md border border-border p-4"><p className="text-xs text-muted-foreground">Total duration</p><p className="mt-2 font-mono text-2xl font-semibold">{selected.total}</p></div></div><div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">{selected.steps.map(([label, duration], index) => <div key={label} className={cn("rounded-xl border p-4", index === stageIndex && "border-primary bg-muted")}><p className="text-sm">{label}</p><p className="mt-2 font-mono text-sm text-muted-foreground">{duration}</p></div>)}</div></CardContent></Card>
 
         <Card><CardHeader><CardTitle className="font-heading">Audit history</CardTitle><CardDescription>Operator changes remain attached to the work order.</CardDescription></CardHeader><CardContent className="flex flex-col gap-3">{audit.map((event) => <p key={event} className="rounded-md border border-border px-4 py-3 font-mono text-xs text-muted-foreground">{event}</p>)}</CardContent></Card>
       </div>
@@ -72,4 +72,14 @@ export function MaintenanceControl() {
   );
 }
 
+function RecoveryCommandCenter({ stageIndex, scenario, availability, total, onSelectStage }: { stageIndex: number; scenario: RecoveryScenarioId; availability: string; total: string; onSelectStage: (stage: number) => void }) {
+  const progress = Math.round(((stageIndex + 1) / demoMaintenanceStages.length) * 100);
+  return <section className="relative overflow-hidden rounded-[2.2rem] bg-[#252423] p-6 text-[#faf7f3] shadow-[0_28px_48px_rgba(0,0,0,0.12)] md:p-8"><div className="pointer-events-none absolute -right-20 -top-24 size-80 rounded-full border-[34px] border-amber-300/20" /><div className="pointer-events-none absolute -bottom-36 left-[35%] size-72 rounded-full bg-emerald-400/10 blur-3xl" /><div className="relative"><div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"><div><p className="text-[10px] font-bold tracking-[0.16em] text-amber-300">LIVE RECOVERY COMMAND</p><h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">WS-102 return-to-service</h2><p className="mt-2 max-w-xl text-sm leading-6 text-white/60">Move through the recovery lifecycle, inspect the time impact, and keep the work order in a controlled state.</p></div><div className="flex flex-wrap gap-3"><CommandMetric icon={Clock3} label="Recovery time" value={total} /><CommandMetric icon={CircleGauge} label="Completion" value={`${progress}%`} /></div></div><div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.06] p-4"><div className="flex flex-wrap items-center justify-between gap-3"><span className="text-xs font-semibold text-white/70">Current phase: <strong className="text-white">{demoMaintenanceStages[stageIndex]}</strong></span><span className={scenario === "local" ? "rounded-full bg-emerald-300 px-3 py-1 text-[10px] font-bold tracking-[0.08em] text-[#123426]" : "rounded-full bg-amber-300 px-3 py-1 text-[10px] font-bold tracking-[0.08em] text-[#3d2d00]"}>{scenario === "local" ? "LOCAL SPARE PATH" : "VENDOR RECOVERY PATH"}</span></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-amber-300 via-amber-300 to-emerald-300 transition-[width] duration-300" style={{ width: `${progress}%` }} /></div></div><ol className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{demoMaintenanceStages.map((stage, index) => <li key={stage}><button onClick={() => onSelectStage(index)} aria-current={index === stageIndex ? "step" : undefined} className={cn("group flex min-h-24 w-full items-center gap-3 rounded-2xl border p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white", index === stageIndex ? "border-amber-300 bg-amber-300 text-[#2d2500]" : index < stageIndex ? "border-emerald-300/30 bg-emerald-300/10 text-white hover:bg-emerald-300/15" : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.09] ")}><span className={cn("grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold", index === stageIndex ? "bg-[#252423] text-amber-300" : index < stageIndex ? "bg-emerald-300 text-[#123426]" : "bg-white/10 text-white/70")}>{index < stageIndex ? <Check className="size-4" /> : index + 1}</span><span><span className="block text-sm font-semibold">{stage}</span><span className="mt-1 block text-[10px] font-medium tracking-[0.06em] opacity-65">{index === stageIndex ? "ACTIVE CONTROL" : index < stageIndex ? "COMPLETE" : "UPCOMING"}</span></span></button></li>)}</ol><div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5 text-xs text-white/60"><span className="flex items-center gap-2"><ShieldCheck className="size-4 text-emerald-300" />Work order WO-WS102-081 is under controlled execution</span><span className="font-mono text-white/80">Availability: {availability}</span></div></div></section>;
+}
+
+function CommandMetric({ icon: Icon, label, value }: { icon: typeof Clock3; label: string; value: string }) { return <div className="min-w-32 rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-3"><div className="flex items-center gap-2 text-[10px] font-bold tracking-[0.09em] text-white/55"><Icon className="size-3.5 text-amber-300" />{label.toUpperCase()}</div><p className="mt-2 font-mono text-xl font-semibold text-white">{value}</p></div>; }
+function UptimeSignal({ stageIndex }: { stageIndex: number }) { const markers = Array.from({ length: 45 }, (_, index) => index); return <section className="overflow-hidden rounded-[2rem] bg-[#1d1d1d] p-6 text-[#f7f5f1] shadow-[0_22px_40px_rgba(0,0,0,0.11)]"><div className="flex items-center justify-between gap-4"><div><p className="text-2xl font-semibold tracking-[-0.025em]">Uptime</p><p className="mt-1 text-sm text-white/55">Recent WS-102 operating signal</p></div><strong className="text-2xl tracking-[-0.03em]">{stageIndex >= 6 ? "100%" : "99.9%"}</strong></div><div className="mt-7 grid grid-cols-[repeat(45,minmax(0,1fr))] gap-1.5" aria-label="45 day uptime signal">{markers.map((index) => <i key={index} className={cn("h-8 rounded-full", index === 9 || index === 25 || index === 31 ? "bg-amber-400" : index === 38 ? "bg-rose-400" : index === 40 ? "bg-orange-400" : "bg-emerald-400")} />)}</div><div className="mt-5 flex justify-between text-sm text-white/50"><span>45 days ago</span><span>{stageIndex >= 6 ? "Returned to service" : "Today"}</span></div></section>; }
+
 function Detail({ icon: Icon, label, value }: { icon: typeof Factory; label: string; value: string }) { return <div className="flex gap-3 rounded-md bg-muted p-4"><Icon className="mt-0.5 size-4 text-muted-foreground" /><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-sm font-medium">{value}</p></div></div>; }
+function RecoveryFact({ label, value, dark = false }: { label: string; value: string; dark?: boolean }) { return <div className={dark ? "rounded-2xl border border-white/10 bg-white/[0.08] p-5" : "rounded-2xl bg-muted p-5"}><p className={dark ? "font-mono text-[10px] uppercase tracking-widest text-white/55" : "font-mono text-[10px] uppercase tracking-widest text-muted-foreground"}>{label}</p><p className={dark ? "mt-2 font-semibold text-white" : "mt-2 font-semibold"}>{value}</p></div>; }
+function RecoveryRow({ label, value, tone }: { label: string; value: string; tone: "destructive" | "warning" | "success" }) { const dot = tone === "destructive" ? "bg-destructive" : tone === "warning" ? "bg-warning" : "bg-success"; return <div className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"><span className="text-sm text-muted-foreground">{label}</span><span className="flex items-center gap-2 text-sm font-medium"><i className={cn("size-2 rounded-full", dot)} />{value}</span></div>; }

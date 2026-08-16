@@ -6,24 +6,16 @@ import { Check, CircleAlert, MailWarning, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { demoNotifications, type DemoNotification, type NotificationStatus } from "@/demo-data/ws102-scenario";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "unread" | "failed" | "acknowledged";
-type Notice = { id: string; title: string; detail: string; status: "unread" | "failed" | "acknowledged"; href: string };
-
-// demo_data
-const initialNotices: Notice[] = [
-  { id: "NT-102", title: "WS-102 failure prediction", detail: "92% bearing failure risk / FC-2024-0047", status: "unread", href: "/failure/FC-2024-0047" },
-  { id: "NT-117", title: "BRG-10023 reservation confirmed", detail: "Reservation R-10023 linked to WO-WS102-081", status: "acknowledged", href: "/warehouse" },
-  { id: "NT-121", title: "Shipment delivery retry required", detail: "Logistics Desk notification did not confirm delivery", status: "failed", href: "/shipment" },
-  { id: "NT-128", title: "Vendor acknowledgement recorded", detail: "Apex Motion Components confirmed the request state", status: "unread", href: "/procurement" },
-];
+type Filter = "all" | NotificationStatus;
 
 export function NotificationsControl() {
   const [filter, setFilter] = useState<Filter>("all");
-  const [notices, setNotices] = useState(initialNotices);
+  const [notices, setNotices] = useState<DemoNotification[]>(() => [...demoNotifications]);
   const visible = useMemo(() => filter === "all" ? notices : notices.filter((notice) => notice.status === filter), [filter, notices]);
-  const update = (id: string, status: Notice["status"]) => setNotices((items) => items.map((item) => item.id === id ? { ...item, status } : item));
+  const update = (id: string, status: NotificationStatus) => setNotices((items) => items.map((item) => item.id === id ? { ...item, status } : item));
 
   return (
     <main className="px-5 py-7 md:px-8 md:py-10">

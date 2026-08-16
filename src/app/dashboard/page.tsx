@@ -1,5 +1,5 @@
-import { TwinWorkspace } from "@/components/TwinWorkspace";
+import { PlantOverviewDashboard } from "@/components/PlantOverviewDashboard";
 
 export default function DashboardPage() {
-  return <TwinWorkspace />;
+  return <PlantOverviewDashboard />;
 }

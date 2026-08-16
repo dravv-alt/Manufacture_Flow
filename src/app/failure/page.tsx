@@ -1,5 +1,2 @@
-import { CommandCenter } from "@/components/CommandCenter";
-
-export default function FailurePage() {
-  return <CommandCenter view="failure" />;
-}
+import { FailureIndex } from "@/components/FailureViews";
+export default function FailurePage() { return <FailureIndex />; }

@@ -1,5 +1,2 @@
-import { FailureControl } from "@/components/FailureControl";
-
-export default function FailureCasePage() {
-  return <FailureControl />;
-}
+import { FailureCaseDetail } from "@/components/FailureViews";
+export default async function FailureCasePage({ params }: { params: Promise<{ id: string }> }) { const { id } = await params; return <FailureCaseDetail caseId={id} />; }

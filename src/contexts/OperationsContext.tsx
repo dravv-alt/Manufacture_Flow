@@ -1,0 +1,17 @@
+"use client";
+
+import { createContext, useContext, useEffect, useMemo, useReducer, useState, type ReactNode } from "react";
+import { demoOperationsSnapshot, type DataCondition, type Role, type TwinMode } from "@/demo-data/operations";
+import { demoOperationsDataProvider } from "@/demo-data/provider";
+import type { ProcurementState, RecoveryScenarioId, ShipmentState } from "@/demo-data/ws102-scenario";
+
+export type InventoryState = "available" | "unavailable" | "contention" | "stale" | "failed";
+export type RoutingOutcome = "draft" | "approved" | "partial" | "no-compatible" | "stale" | "conflict";
+
+export interface OperationsState { selectedWorkstationId: string; selectedComponentId: string; twinMode: TwinMode; role: Role; condition: DataCondition; allocationBlocked: boolean; inventoryState: InventoryState; inventoryAvailable: boolean; bearingReserved: boolean; rerouteTargetId: string; routingApproved: boolean; routingOutcome: RoutingOutcome; procurementState: ProcurementState; procurementNote: string; procurementNotes: string[]; recoveryScenario: RecoveryScenarioId; maintenanceStage: number; maintenanceAssignee: string; shipmentState: ShipmentState; reducedMotion: boolean; }
+type Action = { type: "patch"; patch: Partial<OperationsState> } | { type: "reset" };
+export const initialOperationsState: OperationsState = { selectedWorkstationId: "WS-102", selectedComponentId: "bearing", twinMode: "health", role: "Plant Manager", condition: "ready", allocationBlocked: true, inventoryState: "available", inventoryAvailable: true, bearingReserved: false, rerouteTargetId: "WS-105", routingApproved: false, routingOutcome: "draft", procurementState: "draft", procurementNote: "", procurementNotes: [], recoveryScenario: "local", maintenanceStage: 2, maintenanceAssignee: "A. Kulkarni / Maintenance Lead", shipmentState: "revised", reducedMotion: false };
+const OperationsContext = createContext<{ state: OperationsState; data: typeof demoOperationsSnapshot; update: (patch: Partial<OperationsState>) => void; reset: () => void } | null>(null);
+function reducer(state: OperationsState, action: Action): OperationsState { return action.type === "reset" ? initialOperationsState : { ...state, ...action.patch }; }
+export function OperationsProvider({ children }: { children: ReactNode }) { const [state, dispatch] = useReducer(reducer, initialOperationsState); const [sessionRestored, setSessionRestored] = useState(false); useEffect(() => { try { const stored = sessionStorage.getItem("machine-overwatch-state"); if (stored) dispatch({ type: "patch", patch: JSON.parse(stored) as Partial<OperationsState> }); } catch { /* Invalid local session state falls back to the controlled scenario. */ } finally { setSessionRestored(true); } }, []); useEffect(() => { if (sessionRestored) sessionStorage.setItem("machine-overwatch-state", JSON.stringify(state)); }, [sessionRestored, state]); useEffect(() => { document.documentElement.dataset.reducedMotion = String(state.reducedMotion); }, [state.reducedMotion]); const value = useMemo(() => ({ state, data: demoOperationsDataProvider.getSnapshot(), update: (patch: Partial<OperationsState>) => dispatch({ type: "patch", patch }), reset: () => dispatch({ type: "reset" }) }), [state]); return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>; }
+export function useOperations() { const context = useContext(OperationsContext); if (!context) throw new Error("useOperations must be used within OperationsProvider"); return context; }

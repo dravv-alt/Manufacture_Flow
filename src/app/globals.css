@@ -182,9 +182,9 @@
   --muted-foreground: oklch(0.48 0.01 80);
   --accent: oklch(0.945 0.004 80);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --warning: oklch(0.769 0.164 70.08);
-  --success: oklch(0.627 0.17 149.21);
+  --destructive: oklch(0.606 0.23 27.2);
+  --warning: oklch(0.772 0.164 74.5);
+  --success: oklch(0.615 0.154 151.6);
   --twin-canvas: oklch(0.205 0 0);
   --border: oklch(0.89 0.006 80);
   --input: oklch(0.89 0.006 80);
@@ -247,5 +247,171 @@
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Executive dashboard visual system — adapted from the approved Stitch executive reference. */
+.executive-dashboard [data-slot="card"] {
+  border-radius: 2rem;
+  background: #ffffff;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.035);
+  ring: none;
+}
+
+.executive-dashboard [data-slot="card"]:hover {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.06);
+}
+
+.executive-dashboard [data-slot="card"].executive-dark-card {
+  background: #302f2e;
+  color: #fdf8f8;
+}
+
+.executive-dashboard [data-slot="card"].executive-dark-card:hover {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.14);
+}
+
+@media (min-width: 1024px) {
+  .app-shell > header {
+    display: none;
+  }
+
+  .app-shell #mobile-navigation {
+    position: fixed;
+    top: 50%;
+    left: 1.5rem;
+    z-index: 40;
+    display: block;
+    width: 4.5rem !important;
+    height: auto;
+    max-height: calc(100vh - 3rem);
+    transform: translateY(-50%);
+    overflow-y: auto;
+    border: 1px solid oklch(0.91 0.008 80);
+    border-radius: 2rem;
+    background: #ffffff;
+    padding: 0.75rem;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.08);
+  }
+
+  .app-shell #main-content {
+    margin-left: 5.5rem;
+  }
+
+  .app-shell #mobile-navigation .xl\:inline {
+    display: none;
+  }
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+/* The procurement composer owns its focus state as one calm, unified surface. */
+#procurement-note,
+#procurement-note:focus,
+#procurement-note:focus-visible {
+  appearance: none;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+form:has(#procurement-note:focus-visible) {
+  border-color: #b8aa98 !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(184, 170, 152, 0.18), 0 12px 24px rgba(82, 66, 47, 0.07) !important;
+}
+
+/* Procurement communications use one calm, role-led message language. */
+[role="log"] {
+  background: #f7f5f2 !important;
+}
+
+[role="log"] > div {
+  border: 1px solid #ded8d1 !important;
+  border-left: 3px solid #b8aa98 !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(82, 66, 47, 0.045) !important;
+  color: #292524 !important;
+}
+
+[role="log"] > div :is(p, strong, span) {
+  color: inherit !important;
+}
+
+[role="log"] > div:nth-child(2) {
+  border-left-color: #252423 !important;
+}
+
+[role="log"] > div:nth-child(n + 3) {
+  border-left-color: #4d9b72 !important;
+}
+
+@media (pointer: coarse) {
+  :where(button, a, input, select) {
+    min-height: 44px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell #mobile-navigation {
+    width: 4.25rem !important;
+    min-width: 4.25rem;
+    max-width: 4.25rem;
+    overflow-x: hidden;
+    transition: width 240ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 240ms ease;
+  }
+
+  .app-shell #mobile-navigation:hover {
+    width: 12.25rem !important;
+    min-width: 12.25rem;
+    max-width: 12.25rem;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.10);
+  }
+
+  .app-shell #mobile-navigation a {
+    gap: 0;
+    transition: gap 240ms cubic-bezier(0.22, 1, 0.36, 1), background-color 160ms ease, color 160ms ease;
+  }
+
+  .app-shell #mobile-navigation .xl\:inline {
+    display: inline-block !important;
+    max-width: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateX(-6px);
+    white-space: nowrap;
+    transition: max-width 180ms ease, opacity 140ms ease, transform 180ms ease;
+  }
+
+  .app-shell #mobile-navigation:hover a {
+    justify-content: flex-start;
+    gap: 0.75rem;
+  }
+
+  .app-shell #mobile-navigation:hover .xl\:inline {
+    max-width: 8.75rem;
+    opacity: 1;
+    transform: translateX(0);
+    transition-delay: 55ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell #mobile-navigation,
+  .app-shell #mobile-navigation a,
+  .app-shell #mobile-navigation .xl\:inline {
+    transition: none !important;
   }
 }

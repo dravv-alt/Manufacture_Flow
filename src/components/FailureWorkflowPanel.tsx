@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — retained only as a dependency of archived command-center components.
+ * Active failure routes use FailureViews; do not import this component into new work.
+ */
+
 import { useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import { gsap } from "gsap";

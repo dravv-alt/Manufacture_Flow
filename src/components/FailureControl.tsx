@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — replaced by FailureViews and the shared operational workflow state.
+ * Retained intact for review; do not import into active routes.
+ */
+
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Clock3, PackageSearch, Route, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — replaced by route-specific controls and the OperationsContext workflow state.
+ * Retained intact for review; do not import into active routes.
+ */
+
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";

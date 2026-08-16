@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — superseded by MaintenanceControl and shared workflow state.
+ * Retained intact for review; do not import into active routes.
+ */
+
 // demo_data
 import { useState } from "react";
 

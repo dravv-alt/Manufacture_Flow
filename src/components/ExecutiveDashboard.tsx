@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — replaced by TwinWorkspace and target-owned dashboard route components.
+ * Retained intact for review; do not import into active routes.
+ */
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ArrowRight, CalendarClock, CircleAlert, Database, PackageCheck, Search, Wrench } from "lucide-react";
@@ -57,4 +62,4 @@ export function ExecutiveDashboard() {
 
 function Stat({ label, value, detail, danger = false }: { label: string; value: string; detail: string; danger?: boolean }) { return <Card><CardHeader className="gap-1"><CardDescription>{label}</CardDescription><CardTitle className={cn("font-heading text-4xl", danger && "text-destructive")}>{value}</CardTitle></CardHeader><CardContent><p className="font-mono text-xs text-muted-foreground">{detail}</p></CardContent></Card>; }
 function QueueItem({ label, detail, link }: { label: string; detail: string; link: string }) { return <Link href={link} className="rounded-xl bg-primary-foreground/10 p-3 transition-colors hover:bg-primary-foreground/15"><p className="text-sm font-semibold">{label}</p><p className="mt-1 text-xs text-primary-foreground/65">{detail}</p></Link>; }
-function Status({ status }: { status: string }) { return <Badge variant={status === "At Risk" ? "destructive" : status === "Under Maintenance" ? "outline" : "secondary"}>{status}</Badge>; }
+function Status({ status }: { status: string }) { return <Badge variant={status === "At Risk" ? "destructive" : status === "Under Maintenance" ? "warning" : "success"}>{status}</Badge>; }

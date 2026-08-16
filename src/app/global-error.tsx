@@ -1,0 +1,1 @@
+"use client"; export default function GlobalError() { return <html lang="en"><body className="grid min-h-screen place-items-center bg-background text-foreground"><p className="font-mono text-sm">Machine Overwatch is temporarily unavailable. No scenario action was applied.</p></body></html>; }

@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — replaced by the active twin dependency view.
+ * Retained intact for review; do not import into active routes.
+ */
+
 // demo_data
 import { Workstation } from "@/data/workstations";
 import { AlertOctagon, Activity, ShieldAlert, Cpu } from "lucide-react";

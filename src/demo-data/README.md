@@ -6,4 +6,4 @@ Every fixture, seeded scenario, and simulated value in this directory must begin
 
 This frontend currently presents a controlled demonstration. Do not describe these values as live plant telemetry.
 
-When a real API is introduced, keep adapters separate from these fixtures so the source of each value remains explicit.
+`types.ts` defines the demo contract and `provider.ts` is the active controlled-scenario provider. When a real API is introduced, keep its adapter separate from these fixtures so the source of each value remains explicit.

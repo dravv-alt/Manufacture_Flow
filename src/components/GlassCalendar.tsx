@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — replaced by the current maintenance calendar and demo-data contracts.
+ * Retained intact for review; do not import into active routes.
+ */
+
 // demo_data
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, AlertTriangle, CheckCircle2 } from "lucide-react";

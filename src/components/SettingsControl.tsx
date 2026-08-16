@@ -6,21 +6,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useOperations } from "@/contexts/OperationsContext";
 
 // demo_data
 export function SettingsControl() {
-  const [reducedMotion, setReducedMotion] = useState(false);
+  // REDUNDANT LOCAL STATE — shared preferences now persist in OperationsContext.
+  // const [reducedMotion, setReducedMotion] = useState(false);
   const [demoMode, setDemoMode] = useState(true);
-  const [role, setRole] = useState("Plant Manager");
   const [saved, setSaved] = useState(false);
+  const { state, update } = useOperations();
+  const { reducedMotion, role } = state;
 
   return (
     <main className="px-5 py-7 md:px-8 md:py-10">
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <section className="flex flex-col gap-4 border-b border-border pb-7"><div className="flex items-center gap-3"><Badge variant="outline">DEMO DATA</Badge><span className="font-mono text-xs text-muted-foreground">WORKSPACE CONTROLS</span></div><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em]">Settings and demo controls.</h1><p className="max-w-2xl text-base leading-7 text-muted-foreground">These controls change local interface preferences only. They do not alter plant equipment, allocate jobs, send vendor requests, or notify external parties.</p></section>
         <section className="grid gap-5 md:grid-cols-2">
-          <Card><CardHeader><CardTitle className="font-heading">User context</CardTitle><CardDescription>Role and plant context for this controlled UI scenario.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><Setting label="Active role" value={role} action="Change role" onClick={() => setRole((value) => value === "Plant Manager" ? "Maintenance Lead" : "Plant Manager")} /><Setting label="Plant context" value="North Fabrication Plant / Line A" /><Setting label="Permissions" value="Review, approve drafts, update work orders" /></CardContent></Card>
-          <Card><CardHeader><CardTitle className="font-heading">Accessibility</CardTitle><CardDescription>Motion and visual controls are local preferences.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><Toggle label="Reduced motion" detail="Stops non-essential animation in the twin and workflow surfaces." enabled={reducedMotion} onClick={() => setReducedMotion((value) => !value)} /><Toggle label="Demo scenario mode" detail="Keeps the visible data source labelled as controlled demo data." enabled={demoMode} onClick={() => setDemoMode((value) => !value)} /></CardContent></Card>
+          <Card><CardHeader><CardTitle className="font-heading">User context</CardTitle><CardDescription>Role and plant context for this controlled UI scenario.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><Setting label="Active role" value={role} action="Change role" onClick={() => update({ role: role === "Plant Manager" ? "Maintenance Lead" : "Plant Manager" })} /><Setting label="Plant context" value="North Fabrication Plant / Line A" /><Setting label="Permissions" value="Review, approve drafts, update work orders" /></CardContent></Card>
+          <Card><CardHeader><CardTitle className="font-heading">Accessibility</CardTitle><CardDescription>Motion and visual controls are shared workspace preferences.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><Toggle label="Reduced motion" detail="Stops non-essential animation in the twin and workflow surfaces." enabled={reducedMotion} onClick={() => update({ reducedMotion: !reducedMotion })} /><Toggle label="Demo scenario mode" detail="Keeps the visible data source labelled as controlled demo data." enabled={demoMode} onClick={() => setDemoMode((value) => !value)} /></CardContent></Card>
         </section>
         <Card><CardHeader><CardTitle className="font-heading">Data and decision boundary</CardTitle><CardDescription>Clear source ownership prevents the UI from presenting a recommendation as an approved action.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Boundary icon={Eye} title="Data source" detail={demoMode ? "Controlled fixture data" : "No live connector configured"} /><Boundary icon={ShieldCheck} title="Approvals" detail="Human-controlled in every workflow" /><Boundary icon={MonitorCog} title="Motion preference" detail={reducedMotion ? "Reduced motion enabled" : "Standard motion enabled"} /></CardContent></Card>
         <div><Button onClick={() => setSaved(true)}>{saved ? <Check data-icon="inline-start" /> : null}{saved ? "Preferences saved locally" : "Save local preferences"}</Button></div>

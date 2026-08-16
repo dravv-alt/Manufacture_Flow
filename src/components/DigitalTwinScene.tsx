@@ -67,7 +67,7 @@ export function DigitalTwinScene({ machineId, inspectionProgress = 0, sceneMode 
           </Bounds>
           <ContactShadows position={[0, -1.5, 0]} opacity={0.45} scale={20} blur={2.5} far={8} />
         </Suspense>
-        <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan minDistance={0.05} maxDistance={250} zoomToCursor autoRotate={sceneMode === "overview"} autoRotateSpeed={0.45} />
+        <OrbitControls makeDefault enableDamping dampingFactor={0.08} enablePan minDistance={0.05} maxDistance={250} zoomToCursor autoRotate={false} />
       </Canvas>
     </div>
   );

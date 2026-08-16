@@ -1,5 +1,10 @@
 "use client";
 
+/**
+ * REDUNDANT — replaced by TwinWorkspace's workstation and component inspector.
+ * Retained intact for review; do not import into active routes.
+ */
+
 import { useState, useEffect } from "react";
 import { Workstation } from "@/data/workstations";
 
