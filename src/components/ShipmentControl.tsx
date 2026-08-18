@@ -15,9 +15,9 @@ export function ShipmentControl() {
   // REDUNDANT LOCAL STATE — retained for review; shipment state now persists in OperationsContext.
   // const [state, setState] = useState<ShipmentState>("revised");
   // const [notificationLog, setNotificationLog] = useState<string[]>([]);
-  const { state: operationsState, update } = useOperations();
+  const { state: operationsState, runWorkflowCommand, commandError, clearCommandError } = useOperations();
   const state = operationsState.shipmentState;
-  const setState = (shipmentState: ShipmentState) => update({ shipmentState });
+  const setState = (shipmentState: ShipmentState) => runWorkflowCommand({ type: "set_shipment_state", state: shipmentState });
   const states = demoShipmentStates;
   const notificationLog = state === "notified" ? ["Shipment Team · delivered", "Logistics Desk · delivered", "Customer Service · delivered"] : state === "failed" ? ["Shipment Team · delivered", "Logistics Desk · failed", "Customer Service · delivered"] : [];
   // REDUNDANT LOCAL SETTER — notifications are now derived from the persisted shipment state.
@@ -32,12 +32,13 @@ export function ShipmentControl() {
     <main className="px-5 py-7 md:px-8 md:py-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="flex flex-col gap-5 border-b border-border pb-7">
-          <div className="flex flex-wrap items-center gap-3"><Badge variant="outline">DEMO DATA</Badge><span className="font-mono text-xs text-muted-foreground">SHIPMENT IMPACT / SO-8841 / WS-102 RECOVERY</span></div>
+          <div className="flex flex-wrap items-center gap-3"><Badge variant="outline">CONTROLLED DATA</Badge><span className="font-mono text-xs text-muted-foreground">SHIPMENT IMPACT / SO-8841 / WS-102 RECOVERY</span></div>
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Keep the delivery commitment visible.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">Compare original and revised production timing before stakeholder notifications are sent. Customer-facing communication remains a preview.</p></div><Badge variant={current.badge}>{current.label}</Badge></div>
         </section>
 
         <ShipmentSignal delayed={delayed} shipment={schedule.shipment} delay={schedule.delay} />
 
+        {commandError ? <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{commandError}</span><button className="underline" onClick={clearCommandError}>Dismiss</button></div> : null}
         <ShipmentNavigator state={state} shipment={schedule.shipment} delay={schedule.delay} onStateChange={setState} />
 
         <ShipmentRouteWeather state={state} shipment={schedule.shipment} delayed={delayed} />

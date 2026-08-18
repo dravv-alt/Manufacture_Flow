@@ -6,6 +6,8 @@ export const planStateEnum = pgEnum("plan_state", ["draft", "approved", "execute
 export const procurementStateEnum = pgEnum("procurement_state", ["draft", "sent", "acknowledged", "delayed"]);
 export const shipmentStateEnum = pgEnum("shipment_state", ["original", "revised", "notification_pending", "notified", "failed"]);
 export const notificationStateEnum = pgEnum("notification_state", ["unread", "acknowledged", "failed"]);
+export const procurementMessageKindEnum = pgEnum("procurement_message_kind", ["system", "internal_note", "vendor"]);
+export const roleEnum = pgEnum("user_role", ["Plant Manager", "Production Supervisor", "Maintenance Lead", "Scheduler", "Warehouse Team", "Procurement Team", "Logistics Team"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -19,6 +21,24 @@ export const plants = pgTable("plants", {
   timezone: varchar("timezone", { length: 64 }).notNull().default("Asia/Kolkata"),
   ...timestamps,
 });
+
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  displayName: varchar("display_name", { length: 160 }).notNull(),
+  role: roleEnum("role").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  ...timestamps,
+});
+
+export const authSessions = pgTable("auth_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [index("auth_sessions_user_expiry_idx").on(table.userId, table.expiresAt)]);
 
 export const workstations = pgTable("workstations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -101,6 +121,15 @@ export const procurementRequests = pgTable("procurement_requests", {
   requiredBy: timestamp("required_by", { withTimezone: true }).notNull(),
   ...timestamps,
 });
+
+export const procurementMessages = pgTable("procurement_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  procurementRequestId: uuid("procurement_request_id").notNull().references(() => procurementRequests.id, { onDelete: "cascade" }),
+  kind: procurementMessageKindEnum("kind").notNull(),
+  body: text("body").notNull(),
+  actor: varchar("actor", { length: 120 }).notNull(),
+  ...timestamps,
+}, (table) => [index("procurement_messages_request_time_idx").on(table.procurementRequestId, table.createdAt)]);
 
 export const maintenanceWorkOrders = pgTable("maintenance_work_orders", {
   id: uuid("id").primaryKey().defaultRandom(),

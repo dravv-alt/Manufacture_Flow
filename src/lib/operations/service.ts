@@ -1,12 +1,16 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { failureCases, inventoryItems, inventoryReservations, maintenanceWorkOrders, notifications, parts, procurementRequests, reroutePlans, shipmentImpacts, workstations, workflowEvents } from "@/lib/db/schema";
+import { failureCases, inventoryItems, inventoryReservations, maintenanceWorkOrders, notifications, parts, procurementMessages, procurementRequests, reroutePlans, shipmentImpacts, workstations, workflowEvents } from "@/lib/db/schema";
 
 export type WorkflowAction =
   | { type: "reserve_part"; actor: string; quantity: number }
   | { type: "approve_reroute"; actor: string }
   | { type: "advance_maintenance"; actor: string; expectedStage: number }
-  | { type: "acknowledge_notification"; actor: string; notificationId: string };
+  | { type: "acknowledge_notification"; actor: string; notificationId: string }
+  | { type: "retry_notification"; actor: string; notificationId: string }
+  | { type: "set_procurement_state"; actor: string; state: "draft" | "sent" | "acknowledged" | "delayed" }
+  | { type: "record_procurement_note"; actor: string; note: string }
+  | { type: "set_shipment_state"; actor: string; state: "no-impact" | "revised" | "delayed" | "notification-pending" | "notified" | "failed" };
 
 export class OperationNotFoundError extends Error {}
 export class OperationConflictError extends Error {}
@@ -58,7 +62,8 @@ export async function getCaseDetail(externalId: string) {
     db.select().from(workflowEvents).where(eq(workflowEvents.failureCaseId, failureCase.id)).orderBy(desc(workflowEvents.occurredAt)),
   ]);
 
-  return { failureCase, workstation: stationRows[0] ?? null, part: partRows[0] ?? null, inventory: inventoryRows, reservations: reservationRows, reroutePlans: rerouteRows, procurementRequests: procurementRows, maintenanceWorkOrders: workOrderRows, shipmentImpacts: shipmentRows, notifications: notificationRows, events: eventRows };
+  const messages = procurementRows[0] ? await db.select().from(procurementMessages).where(eq(procurementMessages.procurementRequestId, procurementRows[0].id)).orderBy(procurementMessages.createdAt) : [];
+  return { failureCase, workstation: stationRows[0] ?? null, part: partRows[0] ?? null, inventory: inventoryRows, reservations: reservationRows, reroutePlans: rerouteRows, procurementRequests: procurementRows, procurementMessages: messages, maintenanceWorkOrders: workOrderRows, shipmentImpacts: shipmentRows, notifications: notificationRows, events: eventRows };
 }
 
 export async function applyWorkflowAction(externalId: string, action: WorkflowAction) {
@@ -98,8 +103,38 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
       return { action: action.type, workOrder: updated };
     }
 
+    if (action.type === "set_procurement_state") {
+      const [request] = await tx.select().from(procurementRequests).where(eq(procurementRequests.failureCaseId, failureCase.id)).limit(1);
+      if (!request) throw new OperationNotFoundError("No procurement request exists for this failure case.");
+      const [updated] = await tx.update(procurementRequests).set({ state: action.state, updatedAt: new Date() }).where(eq(procurementRequests.id, request.id)).returning();
+      await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "procurement_request", entityId: request.id, eventType: `procurement_${action.state}`, actor: action.actor, payload: { previousState: request.state, nextState: action.state } });
+      return { action: action.type, procurementRequest: updated };
+    }
+
+    if (action.type === "record_procurement_note") {
+      const [request] = await tx.select().from(procurementRequests).where(eq(procurementRequests.failureCaseId, failureCase.id)).limit(1);
+      if (!request) throw new OperationNotFoundError("No procurement request exists for this failure case.");
+      const [message] = await tx.insert(procurementMessages).values({ procurementRequestId: request.id, kind: "internal_note", body: action.note, actor: action.actor }).returning();
+      await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "procurement_message", entityId: message.id, eventType: "procurement_note_recorded", actor: action.actor, payload: { procurementRequestId: request.id } });
+      return { action: action.type, procurementMessage: message };
+    }
+
+    if (action.type === "set_shipment_state") {
+      const [impact] = await tx.select().from(shipmentImpacts).where(eq(shipmentImpacts.failureCaseId, failureCase.id)).limit(1);
+      if (!impact) throw new OperationNotFoundError("No shipment impact exists for this failure case.");
+      const stateMap = { "no-impact": "original", revised: "revised", delayed: "revised", "notification-pending": "notification_pending", notified: "notified", failed: "failed" } as const;
+      const [updated] = await tx.update(shipmentImpacts).set({ state: stateMap[action.state], updatedAt: new Date() }).where(eq(shipmentImpacts.id, impact.id)).returning();
+      await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "shipment_impact", entityId: impact.id, eventType: `shipment_${action.state}`, actor: action.actor, payload: { previousState: impact.state, nextState: action.state } });
+      return { action: action.type, shipmentImpact: updated };
+    }
+
     const [notification] = await tx.select().from(notifications).where(and(eq(notifications.id, action.notificationId), eq(notifications.failureCaseId, failureCase.id))).limit(1);
     if (!notification) throw new OperationNotFoundError("Notification does not belong to this failure case.");
+    if (action.type === "retry_notification") {
+      const [updated] = await tx.update(notifications).set({ state: "unread", deliveredAt: new Date(), updatedAt: new Date() }).where(eq(notifications.id, notification.id)).returning();
+      await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "notification", entityId: notification.id, eventType: "notification_retry_requested", actor: action.actor, payload: { recipientRole: notification.recipientRole, channel: notification.channel } });
+      return { action: action.type, notification: updated };
+    }
     if (notification.state === "acknowledged") throw new OperationConflictError("Notification is already acknowledged.");
     const [updated] = await tx.update(notifications).set({ state: "acknowledged", acknowledgedAt: new Date(), acknowledgedBy: action.actor, updatedAt: new Date() }).where(eq(notifications.id, notification.id)).returning();
     await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "notification", entityId: notification.id, eventType: "notification_acknowledged", actor: action.actor, payload: { recipientRole: notification.recipientRole, channel: notification.channel } });

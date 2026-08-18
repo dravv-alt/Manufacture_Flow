@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, queryClient } from "../src/lib/db/client";
-import { failureCases, inventoryItems, maintenanceWorkOrders, notifications, parts, plants, procurementRequests, reroutePlans, shipmentImpacts, workflowEvents, workstations } from "../src/lib/db/schema";
+import { failureCases, inventoryItems, maintenanceWorkOrders, notifications, parts, plants, procurementRequests, reroutePlans, shipmentImpacts, users, workflowEvents, workstations } from "../src/lib/db/schema";
 
 async function one<T>(rows: T[], message: string) {
   const row = rows[0];
@@ -9,6 +9,13 @@ async function one<T>(rows: T[], message: string) {
 }
 
 async function seed() {
+  const localPasswordHash = await bcrypt.hash("MachineOverwatch!2026", 12);
+  await db.insert(users).values([
+    { email: "manager@northfab.local", displayName: "Plant Manager", role: "Plant Manager", passwordHash: localPasswordHash },
+    { email: "maintenance@northfab.local", displayName: "A. Kulkarni", role: "Maintenance Lead", passwordHash: localPasswordHash },
+    { email: "procurement@northfab.local", displayName: "Sarah Jenkins", role: "Procurement Team", passwordHash: localPasswordHash },
+    { email: "logistics@northfab.local", displayName: "Logistics Desk", role: "Logistics Team", passwordHash: localPasswordHash },
+  ]).onConflictDoNothing();
   await db.insert(plants).values({ code: "NORTH-FAB", name: "North Fabrication Plant", timezone: "Asia/Kolkata" }).onConflictDoNothing();
   const plant = await one(await db.select().from(plants).where(eq(plants.code, "NORTH-FAB")), "Plant seed missing.");
 
@@ -50,3 +57,4 @@ async function seed() {
 }
 
 seed().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await queryClient.end({ timeout: 5 }); });
+import bcrypt from "bcryptjs";

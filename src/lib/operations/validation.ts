@@ -7,4 +7,8 @@ export const workflowActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("approve_reroute"), actor }),
   z.object({ type: z.literal("advance_maintenance"), actor, expectedStage: z.number().int().min(1).max(7) }),
   z.object({ type: z.literal("acknowledge_notification"), actor, notificationId: z.string().uuid() }),
+  z.object({ type: z.literal("retry_notification"), actor, notificationId: z.string().uuid() }),
+  z.object({ type: z.literal("set_procurement_state"), actor, state: z.enum(["draft", "sent", "acknowledged", "delayed"]) }),
+  z.object({ type: z.literal("record_procurement_note"), actor, note: z.string().trim().min(1).max(2000) }),
+  z.object({ type: z.literal("set_shipment_state"), actor, state: z.enum(["no-impact", "revised", "delayed", "notification-pending", "notified", "failed"]) }),
 ]);
