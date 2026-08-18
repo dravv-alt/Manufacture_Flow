@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useOperations } from "@/contexts/OperationsContext";
+import { PersistedPreferences } from "@/components/operations/PersistedPreferences";
 
 // demo_data
 export function SettingsControl() {
@@ -26,7 +27,7 @@ export function SettingsControl() {
           <Card><CardHeader><CardTitle className="font-heading">Accessibility</CardTitle><CardDescription>Motion and visual controls are shared workspace preferences.</CardDescription></CardHeader><CardContent className="flex flex-col gap-4"><Toggle label="Reduced motion" detail="Stops non-essential animation in the twin and workflow surfaces." enabled={reducedMotion} onClick={() => update({ reducedMotion: !reducedMotion })} /><Toggle label="Demo scenario mode" detail="Keeps the visible data source labelled as controlled demo data." enabled={demoMode} onClick={() => setDemoMode((value) => !value)} /></CardContent></Card>
         </section>
         <Card><CardHeader><CardTitle className="font-heading">Data and decision boundary</CardTitle><CardDescription>Clear source ownership prevents the UI from presenting a recommendation as an approved action.</CardDescription></CardHeader><CardContent className="grid gap-4 md:grid-cols-3"><Boundary icon={Eye} title="Data source" detail={demoMode ? "Controlled fixture data" : "No live connector configured"} /><Boundary icon={ShieldCheck} title="Approvals" detail="Human-controlled in every workflow" /><Boundary icon={MonitorCog} title="Motion preference" detail={reducedMotion ? "Reduced motion enabled" : "Standard motion enabled"} /></CardContent></Card>
-        <div><Button onClick={() => setSaved(true)}>{saved ? <Check data-icon="inline-start" /> : null}{saved ? "Preferences saved locally" : "Save local preferences"}</Button></div>
+        <PersistedPreferences />
       </div>
     </main>
   );

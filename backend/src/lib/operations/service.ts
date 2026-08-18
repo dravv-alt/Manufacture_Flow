@@ -1,6 +1,6 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { failureCases, inventoryItems, inventoryReservations, maintenanceWorkOrders, notifications, parts, procurementMessages, procurementRequests, reroutePlans, shipmentImpacts, workstations, workflowEvents } from "@/lib/db/schema";
+import { failureCases, inventoryItems, inventoryReservations, maintenanceWorkOrders, notificationAttempts, notifications, parts, procurementMessages, procurementRequests, reroutePlans, shipmentImpacts, workstations, workflowEvents } from "@/lib/db/schema";
 
 export type WorkflowAction =
   | { type: "reserve_part"; actor: string; quantity: number }
@@ -63,7 +63,8 @@ export async function getCaseDetail(externalId: string) {
   ]);
 
   const messages = procurementRows[0] ? await db.select().from(procurementMessages).where(eq(procurementMessages.procurementRequestId, procurementRows[0].id)).orderBy(procurementMessages.createdAt) : [];
-  return { failureCase, workstation: stationRows[0] ?? null, part: partRows[0] ?? null, inventory: inventoryRows, reservations: reservationRows, reroutePlans: rerouteRows, procurementRequests: procurementRows, procurementMessages: messages, maintenanceWorkOrders: workOrderRows, shipmentImpacts: shipmentRows, notifications: notificationRows, events: eventRows };
+  const attempts = notificationRows.length ? await db.select().from(notificationAttempts).where(inArray(notificationAttempts.notificationId, notificationRows.map((notice) => notice.id))).orderBy(desc(notificationAttempts.occurredAt)) : [];
+  return { failureCase, workstation: stationRows[0] ?? null, part: partRows[0] ?? null, inventory: inventoryRows, reservations: reservationRows, reroutePlans: rerouteRows, procurementRequests: procurementRows, procurementMessages: messages, maintenanceWorkOrders: workOrderRows, shipmentImpacts: shipmentRows, notifications: notificationRows, notificationAttempts: attempts, events: eventRows };
 }
 
 export async function applyWorkflowAction(externalId: string, action: WorkflowAction) {
@@ -132,11 +133,15 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
     if (!notification) throw new OperationNotFoundError("Notification does not belong to this failure case.");
     if (action.type === "retry_notification") {
       const [updated] = await tx.update(notifications).set({ state: "unread", deliveredAt: new Date(), updatedAt: new Date() }).where(eq(notifications.id, notification.id)).returning();
+      const [{ nextAttempt }] = await tx.select({ nextAttempt: sql<number>`coalesce(max(${notificationAttempts.attemptNumber}), 0) + 1` }).from(notificationAttempts).where(eq(notificationAttempts.notificationId, notification.id));
+      await tx.insert(notificationAttempts).values({ notificationId: notification.id, attemptNumber: nextAttempt, state: "unread", channel: notification.channel, actor: action.actor, detail: "Delivery retry requested." });
       await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "notification", entityId: notification.id, eventType: "notification_retry_requested", actor: action.actor, payload: { recipientRole: notification.recipientRole, channel: notification.channel } });
       return { action: action.type, notification: updated };
     }
     if (notification.state === "acknowledged") throw new OperationConflictError("Notification is already acknowledged.");
     const [updated] = await tx.update(notifications).set({ state: "acknowledged", acknowledgedAt: new Date(), acknowledgedBy: action.actor, updatedAt: new Date() }).where(eq(notifications.id, notification.id)).returning();
+    const [{ nextAttempt }] = await tx.select({ nextAttempt: sql<number>`coalesce(max(${notificationAttempts.attemptNumber}), 0) + 1` }).from(notificationAttempts).where(eq(notificationAttempts.notificationId, notification.id));
+    await tx.insert(notificationAttempts).values({ notificationId: notification.id, attemptNumber: nextAttempt, state: "acknowledged", channel: notification.channel, actor: action.actor, detail: "Notification acknowledged." });
     await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "notification", entityId: notification.id, eventType: "notification_acknowledged", actor: action.actor, payload: { recipientRole: notification.recipientRole, channel: notification.channel } });
     return { action: action.type, notification: updated };
   });

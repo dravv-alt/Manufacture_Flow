@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const severityEnum = pgEnum("failure_severity", ["critical", "warning"]);
 export const inventoryStateEnum = pgEnum("inventory_state", ["available", "unavailable", "reserved"]);
@@ -39,6 +39,13 @@ export const authSessions = pgTable("auth_sessions", {
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   ...timestamps,
 }, (table) => [index("auth_sessions_user_expiry_idx").on(table.userId, table.expiresAt)]);
+
+export const userPreferences = pgTable("user_preferences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reducedMotion: boolean("reduced_motion").notNull().default(false),
+  ...timestamps,
+}, (table) => [uniqueIndex("user_preferences_user_idx").on(table.userId)]);
 
 export const workstations = pgTable("workstations", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -166,6 +173,17 @@ export const notifications = pgTable("notifications", {
   acknowledgedBy: varchar("acknowledged_by", { length: 120 }),
   ...timestamps,
 }, (table) => [index("notifications_case_state_idx").on(table.failureCaseId, table.state)]);
+
+export const notificationAttempts = pgTable("notification_attempts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  notificationId: uuid("notification_id").notNull().references(() => notifications.id, { onDelete: "cascade" }),
+  attemptNumber: integer("attempt_number").notNull(),
+  state: notificationStateEnum("state").notNull(),
+  channel: varchar("channel", { length: 64 }).notNull(),
+  actor: varchar("actor", { length: 120 }).notNull(),
+  detail: text("detail").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [uniqueIndex("notification_attempt_number_idx").on(table.notificationId, table.attemptNumber), index("notification_attempts_notification_time_idx").on(table.notificationId, table.occurredAt)]);
 
 export const workflowEvents = pgTable("workflow_events", {
   id: uuid("id").primaryKey().defaultRandom(),
