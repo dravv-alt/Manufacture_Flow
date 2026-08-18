@@ -56,6 +56,9 @@ type BackendCaseSnapshot = {
   reservations: Array<{ status: string }>;
   reroutePlans: Array<{ state: "draft" | "approved" | "executed" | "rejected" }>;
   maintenanceWorkOrders: Array<{ stage: number; assignee: string; scenario: RecoveryScenarioId }>;
+  procurementRequests: Array<{ state: ProcurementState }>;
+  procurementMessages: Array<{ kind: "system" | "internal_note" | "vendor"; body: string }>;
+  shipmentImpacts: Array<{ state: "original" | "revised" | "notification_pending" | "notified" | "failed" }>;
 };
 type OperationsContextValue = {
   state: OperationsState;
@@ -101,6 +104,8 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
         const inventory = snapshot.inventory[0];
         const reroute = snapshot.reroutePlans[0];
         const workOrder = snapshot.maintenanceWorkOrders[0];
+        const procurement = snapshot.procurementRequests[0];
+        const shipment = snapshot.shipmentImpacts[0];
         if (!inventory || !workOrder) return;
         dispatch({ type: "patch", patch: {
           bearingReserved: snapshot.reservations.some((reservation) => reservation.status === "active"),
@@ -111,6 +116,9 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
           maintenanceStage: workOrder.stage - 1,
           maintenanceAssignee: workOrder.assignee,
           recoveryScenario: workOrder.scenario,
+          procurementState: procurement?.state ?? initialOperationsState.procurementState,
+          procurementNotes: snapshot.procurementMessages.filter((message) => message.kind === "internal_note").map((message) => message.body),
+          shipmentState: shipment?.state === "original" ? "no-impact" : shipment?.state === "notification_pending" ? "notification-pending" : shipment?.state ?? initialOperationsState.shipmentState,
         } });
       })
       .catch(() => { /* The controlled frontend remains usable if the local API is offline. */ });
