@@ -3,9 +3,10 @@ import { END, START, StateGraph } from "@langchain/langgraph";
 import { and, eq } from "drizzle-orm";
 import { failureAlertingNode } from "@/lib/agent-graph/nodes/failure-alerting";
 import { recoveryOrchestratorNode } from "@/lib/agent-graph/nodes/recovery-orchestrator";
+import { resourceRecoveryNode } from "@/lib/agent-graph/nodes/resource-recovery";
 import { failurePredictionNode } from "@/lib/agent-graph/nodes/failure-prediction";
 import { RecoveryGraphInputNotFoundError, telemetryMonitorNode } from "@/lib/agent-graph/nodes/telemetry";
-import { routeAfterFailurePrediction } from "@/lib/agent-graph/routing/conditions";
+import { routeAfterFailurePrediction, routeAfterRecoveryOrchestrator } from "@/lib/agent-graph/routing/conditions";
 import { initialRecoveryGraphState, RecoveryGraphStateAnnotation, type RecoveryGraphState } from "@/lib/agent-graph/state";
 import { db } from "@/lib/db/client";
 import { recoveryGraphRuns } from "@/lib/db/schema";
@@ -15,11 +16,13 @@ export const recoveryGraph = new StateGraph(RecoveryGraphStateAnnotation)
   .addNode("failure_prediction", failurePredictionNode)
   .addNode("failure_alerting", failureAlertingNode)
   .addNode("recovery_orchestrator", recoveryOrchestratorNode)
+  .addNode("resource_recovery", resourceRecoveryNode)
   .addEdge(START, "telemetry_monitor")
   .addEdge("telemetry_monitor", "failure_prediction")
   .addConditionalEdges("failure_prediction", routeAfterFailurePrediction)
   .addEdge("failure_alerting", "recovery_orchestrator")
-  .addEdge("recovery_orchestrator", END)
+  .addConditionalEdges("recovery_orchestrator", routeAfterRecoveryOrchestrator)
+  .addEdge("resource_recovery", END)
   .compile({ name: "manufacturing-recovery-graph" });
 
 export class RecoveryGraphRunNotFoundError extends Error {}

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { RecoveryGraphState, RecoveryGraphUpdate } from "@/lib/agent-graph/state";
 import { db } from "@/lib/db/client";
-import { agentRuns, failureCases, failurePredictions, recoveryGraphRuns } from "@/lib/db/schema";
+import { agentRuns, failureCases, failurePredictions, parts, recoveryGraphRuns } from "@/lib/db/schema";
 import { runFailurePrediction } from "@/lib/predictions/service";
 
 async function persist(state: RecoveryGraphState, patch: RecoveryGraphUpdate) {
@@ -21,10 +21,11 @@ export async function failurePredictionNode(state: RecoveryGraphState): Promise<
     return patch;
   }
 
-  const [failureCase] = await db.select({ externalId: failureCases.externalId }).from(failureCases)
+  const [failureCase] = await db.select({ externalId: failureCases.externalId, component: failurePredictions.component, partCode: parts.code }).from(failureCases)
     .innerJoin(failurePredictions, eq(failurePredictions.failureCaseId, failureCases.id))
+    .innerJoin(parts, eq(failurePredictions.partId, parts.id))
     .where(eq(failurePredictions.id, result.prediction.id)).limit(1);
-  const patch: RecoveryGraphUpdate = { predictionId: result.prediction.id, failureCaseExternalId: failureCase?.externalId ?? null, workflowStatus: "FAILURE_PREDICTED" };
+  const patch: RecoveryGraphUpdate = { predictionId: result.prediction.id, failureCaseExternalId: failureCase?.externalId ?? null, failureComponent: failureCase?.component ?? null, requiredPartCode: failureCase?.partCode ?? null, workflowStatus: "FAILURE_PREDICTED" };
   await persist(state, patch);
   return patch;
 }

@@ -64,6 +64,13 @@
       "when": 1787161507329,
       "tag": "0008_lively_onslaught",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787166982409,
+      "tag": "0009_crazy_sphinx",
+      "breakpoints": true
     }
   ]
 }

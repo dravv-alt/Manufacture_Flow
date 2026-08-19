@@ -99,6 +99,12 @@ After alerting, the `RecoveryOrchestratorAgent` applies a controlled safety poli
 
 All new production-job assignments must use `assignProductionJob` in `src/lib/orchestration/service.ts`; it rejects an active locked workstation on the server. A lower-risk prediction is recorded as `AT_RISK` without creating an allocation lock.
 
+### Resource Recovery Agent — inventory verification and reservation
+
+Only an allocation-locked recovery continues to `ResourceRecoveryAgent`. The agent consumes the persisted failure-case, component, and required-part fields propagated through the graph state, then evaluates one required unit against the existing same-plant inventory domain. Its conditional database update prevents overselling under concurrent requests.
+
+Every run persists one `resource_recovery_results` record. `reserved` links to its inventory item and `inventory_reservations` row; `procurement_required` is a durable handoff result only—it does not create a purchase requisition, contact a vendor, or advance any downstream workflow.
+
 ## Reset a local demo database
 
 ```powershell

@@ -13,6 +13,7 @@ export const agentRunStatusEnum = pgEnum("agent_run_status", ["running", "comple
 export const recoveryGraphRunStatusEnum = pgEnum("recovery_graph_run_status", ["running", "completed", "requires_intervention", "failed"]);
 export const allocationLockStateEnum = pgEnum("allocation_lock_state", ["active", "released"]);
 export const productionJobStateEnum = pgEnum("production_job_state", ["queued", "in_flight", "completed", "cancelled"]);
+export const resourceRecoveryOutcomeEnum = pgEnum("resource_recovery_outcome", ["reserved", "procurement_required"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -227,6 +228,24 @@ export const inventoryReservations = pgTable("inventory_reservations", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   ...timestamps,
 }, (table) => [index("inventory_reservations_case_idx").on(table.failureCaseId)]);
+
+/** Durable agent outcome: either a concrete reservation or an explicit procurement-required handoff. */
+export const resourceRecoveryResults = pgTable("resource_recovery_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  failurePredictionId: uuid("failure_prediction_id").notNull().references(() => failurePredictions.id, { onDelete: "restrict" }).unique(),
+  failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  inventoryItemId: uuid("inventory_item_id").references(() => inventoryItems.id, { onDelete: "restrict" }),
+  inventoryReservationId: uuid("inventory_reservation_id").references(() => inventoryReservations.id, { onDelete: "restrict" }),
+  correlationId: varchar("correlation_id", { length: 160 }).notNull(),
+  outcome: resourceRecoveryOutcomeEnum("outcome").notNull(),
+  requiredQuantity: integer("required_quantity").notNull(),
+  availableQuantity: integer("available_quantity").notNull(),
+  reason: text("reason").notNull(),
+  ...timestamps,
+}, (table) => [
+  index("resource_recovery_results_case_idx").on(table.failureCaseId),
+  index("resource_recovery_results_correlation_idx").on(table.correlationId),
+]);
 
 export const reroutePlans = pgTable("reroute_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
