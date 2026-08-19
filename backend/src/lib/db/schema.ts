@@ -10,6 +10,7 @@ export const procurementMessageKindEnum = pgEnum("procurement_message_kind", ["s
 export const roleEnum = pgEnum("user_role", ["Plant Manager", "Production Supervisor", "Maintenance Lead", "Scheduler", "Warehouse Team", "Procurement Team", "Logistics Team"]);
 export const telemetryAnomalySeverityEnum = pgEnum("telemetry_anomaly_severity", ["none", "warning", "critical"]);
 export const agentRunStatusEnum = pgEnum("agent_run_status", ["running", "completed", "failed"]);
+export const recoveryGraphRunStatusEnum = pgEnum("recovery_graph_run_status", ["running", "completed", "requires_intervention", "failed"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -93,6 +94,7 @@ export const agentRuns = pgTable("agent_runs", {
   agentName: varchar("agent_name", { length: 120 }).notNull(),
   status: agentRunStatusEnum("status").notNull().default("running"),
   workstationId: uuid("workstation_id").references(() => workstations.id, { onDelete: "restrict" }),
+  correlationId: varchar("correlation_id", { length: 160 }),
   sourceEventId: varchar("source_event_id", { length: 128 }),
   input: jsonb("input").notNull().$type<Record<string, unknown>>(),
   output: jsonb("output").$type<Record<string, unknown>>(),
@@ -101,8 +103,23 @@ export const agentRuns = pgTable("agent_runs", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
 }, (table) => [
   index("agent_runs_station_time_idx").on(table.workstationId, table.startedAt),
+  index("agent_runs_correlation_idx").on(table.correlationId),
   index("agent_runs_source_event_idx").on(table.sourceEventId),
   uniqueIndex("agent_runs_agent_source_event_idx").on(table.agentName, table.sourceEventId),
+]);
+
+/** Durable product record for a LangGraph recovery invocation. */
+export const recoveryGraphRuns = pgTable("recovery_graph_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  correlationId: varchar("correlation_id", { length: 160 }).notNull().unique(),
+  telemetrySourceEventId: varchar("telemetry_source_event_id", { length: 128 }).notNull(),
+  status: recoveryGraphRunStatusEnum("status").notNull().default("running"),
+  state: jsonb("state").notNull().$type<Record<string, unknown>>(),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  index("recovery_graph_runs_telemetry_idx").on(table.telemetrySourceEventId, table.startedAt),
 ]);
 
 export const parts = pgTable("parts", {

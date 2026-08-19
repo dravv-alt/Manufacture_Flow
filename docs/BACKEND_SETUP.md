@@ -36,6 +36,8 @@ Run `npm run db:seed` once, then use any of these accounts at `/sign-in`. All lo
 | `GET /api/telemetry?workstationCode=WS-105&limit=50` | Returns the latest persisted telemetry observations for one workstation. |
 | `POST /api/telemetry/{sourceEventId}/predictions` | Runs the controlled Failure Prediction Agent for one persisted telemetry observation. Plant Manager and Production Supervisor only. |
 | `POST /api/failure-predictions/{predictionId}/alerts` | Creates the idempotent, recipient-specific Failure-Prediction Alerting Agent notifications. Plant Manager and Production Supervisor only. |
+| `POST /api/recovery-graph/runs` | Starts the LangGraph recovery runtime for one already-persisted telemetry source event. Plant Manager and Production Supervisor only. |
+| `GET /api/recovery-graph/runs/{correlationId}` | Returns the durable state and status of one recovery graph run. |
 | `GET /api/failure-cases/FC-2026-0047` | Returns the complete WS-102 recovery context and audit timeline. |
 | `POST /api/failure-cases/FC-2026-0047/actions` | Executes guarded reserve, reroute approval, maintenance-stage, and notification acknowledgement commands. |
 | `POST /api/auth/login` | Starts an HTTP-only local session after a password check. |
@@ -79,6 +81,17 @@ The current provider is deterministic and explicitly labelled `ControlledFailure
 `FailurePredictionAlertingAgent` consumes one persisted failure prediction and creates exactly three in-app alerts: Production Supervisor, Maintenance Manager, and Plant Head. Each notification receives initial delivery state, a delivery-attempt history row, an agent-run record, and a workflow event. Repeating the same prediction ID returns the original three alerts without duplicates.
 
 This slice intentionally does not create procurement, shipment, vendor, or customer notifications, and it does not execute allocation or maintenance actions.
+
+### LangGraph recovery runtime
+
+`@langchain/langgraph` coordinates the initial recovery path without replacing deterministic domain services. The current graph is deliberately minimal:
+
+```text
+persisted telemetry -> Failure Prediction Agent -> prediction present? -> Failure-Prediction Alerting Agent
+                                                     no -> end / monitoring
+```
+
+Each invocation persists a `recovery_graph_runs` record and propagates its correlation ID to the existing agent-run records. A graph ending after alerting is marked `requires_intervention`, because allocation lock, resource recovery, rerouting, and delivery impact are intentionally not implemented in this phase. LangGraph is a runtime dependency here; LangSmith is not required and no LLM is invoked.
 
 ## Reset a local demo database
 
