@@ -32,6 +32,8 @@ Run `npm run db:seed` once, then use any of these accounts at `/sign-in`. All lo
 |---|---|
 | `GET /api/health` | Checks PostgreSQL connectivity. |
 | `GET /api/operations/overview` | Returns persisted plant, station, failure, inventory, reroute, maintenance, and shipment summaries. |
+| `POST /api/telemetry` | Records one controlled machine telemetry observation, runs deterministic anomaly classification, and is idempotent by `sourceEventId`. Production calls require `x-telemetry-api-key`. |
+| `GET /api/telemetry?workstationCode=WS-105&limit=50` | Returns the latest persisted telemetry observations for one workstation. |
 | `GET /api/failure-cases/FC-2026-0047` | Returns the complete WS-102 recovery context and audit timeline. |
 | `POST /api/failure-cases/FC-2026-0047/actions` | Executes guarded reserve, reroute approval, maintenance-stage, and notification acknowledgement commands. |
 | `POST /api/auth/login` | Starts an HTTP-only local session after a password check. |
@@ -57,6 +59,12 @@ Run `npm run db:seed` once, then use any of these accounts at `/sign-in`. All lo
 ```
 
 The API records workflow events for every successful command. Inventory reservation uses a database condition so an insufficient concurrent reservation returns HTTP 409 instead of overselling stock. Maintenance transitions check the expected stage before advancing. Every action also requires an HTTP-only session; the server replaces client-supplied actor names with the authenticated display name and checks that role against the command permission matrix.
+
+### Controlled telemetry ingestion
+
+`TelemetryMonitorAgent` is the first automation slice. It classifies an incoming observation as `none`, `warning`, or `critical` from versioned controlled thresholds, persists the reading and an immutable agent-run record, and adds a case audit event when an existing case is linked to that workstation. It deliberately does **not** create a failure case or make a recovery decision; those remain future agent slices.
+
+Use a stable gateway event ID for retries. The same `sourceEventId` returns the original result without a duplicate reading, agent run, or audit event. Set `TELEMETRY_INGEST_API_KEY` outside development and send it as `x-telemetry-api-key`.
 
 ## Reset a local demo database
 

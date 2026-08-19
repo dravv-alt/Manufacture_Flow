@@ -15,7 +15,8 @@
 
 - Replace local demo users/passwords with approved SSO/identity management and password reset policy.
 - Managed PostgreSQL backups, secret manager, TLS/reverse proxy, logging/monitoring, rate limits, and alerting.
-- Real telemetry, ERP/inventory, scheduling, vendor, carrier, and weather providers; current content remains controlled scenario data.
+- Telemetry Monitor Agent is implemented as a controlled deterministic ingestion and anomaly-classification slice. It persists readings, prevents duplicate source events, and records agent/audit output; it does not yet create failure cases or invoke a real ML model.
+- Real telemetry provider, ML prediction, ERP/inventory, scheduling, vendor, carrier, and weather providers; current content remains controlled scenario data.
 - Explicit idempotency keys for externally retried client requests, plus wider approval/execution workflow modeling.
 - Browser E2E execution after Playwright Chromium can download; it is currently environment-blocked.
 - Integrate and validate the user-supplied robot-arm and conveyor/belt 3D assets.

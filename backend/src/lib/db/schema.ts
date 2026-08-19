@@ -1,4 +1,4 @@
-import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, doublePrecision, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const severityEnum = pgEnum("failure_severity", ["critical", "warning"]);
 export const inventoryStateEnum = pgEnum("inventory_state", ["available", "unavailable", "reserved"]);
@@ -8,6 +8,8 @@ export const shipmentStateEnum = pgEnum("shipment_state", ["original", "revised"
 export const notificationStateEnum = pgEnum("notification_state", ["unread", "acknowledged", "failed"]);
 export const procurementMessageKindEnum = pgEnum("procurement_message_kind", ["system", "internal_note", "vendor"]);
 export const roleEnum = pgEnum("user_role", ["Plant Manager", "Production Supervisor", "Maintenance Lead", "Scheduler", "Warehouse Team", "Procurement Team", "Logistics Team"]);
+export const telemetryAnomalySeverityEnum = pgEnum("telemetry_anomaly_severity", ["none", "warning", "critical"]);
+export const agentRunStatusEnum = pgEnum("agent_run_status", ["running", "completed", "failed"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -57,6 +59,50 @@ export const workstations = pgTable("workstations", {
   capacityPercent: integer("capacity_percent").notNull(),
   ...timestamps,
 }, (table) => [index("workstations_plant_idx").on(table.plantId)]);
+
+/**
+ * Append-only machine observations. `sourceEventId` is the idempotency key
+ * supplied by the machine gateway, so a delivery retry cannot create a second
+ * observation or a second anomaly decision.
+ */
+export const telemetryReadings = pgTable("telemetry_readings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workstationId: uuid("workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
+  sourceEventId: varchar("source_event_id", { length: 128 }).notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  temperatureCelsius: doublePrecision("temperature_celsius").notNull(),
+  vibrationMmPerSecond: doublePrecision("vibration_mm_per_second").notNull(),
+  pressureBar: doublePrecision("pressure_bar").notNull(),
+  cycleCount: integer("cycle_count").notNull(),
+  motorCurrentAmps: doublePrecision("motor_current_amps").notNull(),
+  activeErrorCodes: jsonb("active_error_codes").notNull().$type<string[]>(),
+  anomalySeverity: telemetryAnomalySeverityEnum("anomaly_severity").notNull(),
+  anomalyReasons: jsonb("anomaly_reasons").notNull().$type<string[]>(),
+}, (table) => [
+  uniqueIndex("telemetry_readings_source_event_idx").on(table.sourceEventId),
+  index("telemetry_readings_station_observed_idx").on(table.workstationId, table.observedAt),
+]);
+
+/**
+ * Immutable execution record for controlled automation. Future agents share
+ * this shape, while each agent stores its input/output as structured JSON.
+ */
+export const agentRuns = pgTable("agent_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agentName: varchar("agent_name", { length: 120 }).notNull(),
+  status: agentRunStatusEnum("status").notNull().default("running"),
+  workstationId: uuid("workstation_id").references(() => workstations.id, { onDelete: "restrict" }),
+  sourceEventId: varchar("source_event_id", { length: 128 }),
+  input: jsonb("input").notNull().$type<Record<string, unknown>>(),
+  output: jsonb("output").$type<Record<string, unknown>>(),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  index("agent_runs_station_time_idx").on(table.workstationId, table.startedAt),
+  index("agent_runs_source_event_idx").on(table.sourceEventId),
+]);
 
 export const parts = pgTable("parts", {
   id: uuid("id").primaryKey().defaultRandom(),
