@@ -1,0 +1,4 @@
+ALTER TABLE "notifications" ADD COLUMN "failure_prediction_id" uuid;--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_failure_prediction_id_failure_predictions_id_fk" FOREIGN KEY ("failure_prediction_id") REFERENCES "public"."failure_predictions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "notifications_prediction_idx" ON "notifications" USING btree ("failure_prediction_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "notifications_prediction_recipient_idx" ON "notifications" USING btree ("failure_prediction_id","recipient_role");

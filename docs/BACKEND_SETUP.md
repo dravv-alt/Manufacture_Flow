@@ -35,6 +35,7 @@ Run `npm run db:seed` once, then use any of these accounts at `/sign-in`. All lo
 | `POST /api/telemetry` | Records one controlled machine telemetry observation, runs deterministic anomaly classification, and is idempotent by `sourceEventId`. Production calls require `x-telemetry-api-key`. |
 | `GET /api/telemetry?workstationCode=WS-105&limit=50` | Returns the latest persisted telemetry observations for one workstation. |
 | `POST /api/telemetry/{sourceEventId}/predictions` | Runs the controlled Failure Prediction Agent for one persisted telemetry observation. Plant Manager and Production Supervisor only. |
+| `POST /api/failure-predictions/{predictionId}/alerts` | Creates the idempotent, recipient-specific Failure-Prediction Alerting Agent notifications. Plant Manager and Production Supervisor only. |
 | `GET /api/failure-cases/FC-2026-0047` | Returns the complete WS-102 recovery context and audit timeline. |
 | `POST /api/failure-cases/FC-2026-0047/actions` | Executes guarded reserve, reroute approval, maintenance-stage, and notification acknowledgement commands. |
 | `POST /api/auth/login` | Starts an HTTP-only local session after a password check. |
@@ -72,6 +73,12 @@ Use a stable gateway event ID for retries. The same `sourceEventId` returns the 
 `FailurePredictionAgent` is the next isolated automation slice. It consumes one persisted telemetry observation and writes a durable component/part prediction, confidence, time-to-failure, provider version, rationale, agent run, and audit event. It links a matching existing failure case or creates a new `Prediction recorded / awaiting alerting` case. It does **not** alert stakeholders, block allocation, reserve parts, or reroute jobs.
 
 The current provider is deterministic and explicitly labelled `ControlledFailurePredictionProvider / controlled-v1`; it is not a trained ML model. Its WS-102 critical mapping deliberately matches the canonical BRD scenario: `BRG-10023`, 92% probability, and an 18-hour estimate.
+
+### Failure-prediction alerting
+
+`FailurePredictionAlertingAgent` consumes one persisted failure prediction and creates exactly three in-app alerts: Production Supervisor, Maintenance Manager, and Plant Head. Each notification receives initial delivery state, a delivery-attempt history row, an agent-run record, and a workflow event. Repeating the same prediction ID returns the original three alerts without duplicates.
+
+This slice intentionally does not create procurement, shipment, vendor, or customer notifications, and it does not execute allocation or maintenance actions.
 
 ## Reset a local demo database
 

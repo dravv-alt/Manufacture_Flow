@@ -236,6 +236,7 @@ export const shipmentImpacts = pgTable("shipment_impacts", {
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
   failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  failurePredictionId: uuid("failure_prediction_id").references(() => failurePredictions.id, { onDelete: "restrict" }),
   recipientRole: varchar("recipient_role", { length: 96 }).notNull(),
   channel: varchar("channel", { length: 64 }).notNull(),
   subject: varchar("subject", { length: 240 }).notNull(),
@@ -244,7 +245,11 @@ export const notifications = pgTable("notifications", {
   acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
   acknowledgedBy: varchar("acknowledged_by", { length: 120 }),
   ...timestamps,
-}, (table) => [index("notifications_case_state_idx").on(table.failureCaseId, table.state)]);
+}, (table) => [
+  index("notifications_case_state_idx").on(table.failureCaseId, table.state),
+  index("notifications_prediction_idx").on(table.failurePredictionId),
+  uniqueIndex("notifications_prediction_recipient_idx").on(table.failurePredictionId, table.recipientRole),
+]);
 
 export const notificationAttempts = pgTable("notification_attempts", {
   id: uuid("id").primaryKey().defaultRandom(),
