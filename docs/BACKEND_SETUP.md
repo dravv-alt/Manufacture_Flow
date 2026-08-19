@@ -34,6 +34,7 @@ Run `npm run db:seed` once, then use any of these accounts at `/sign-in`. All lo
 | `GET /api/operations/overview` | Returns persisted plant, station, failure, inventory, reroute, maintenance, and shipment summaries. |
 | `POST /api/telemetry` | Records one controlled machine telemetry observation, runs deterministic anomaly classification, and is idempotent by `sourceEventId`. Production calls require `x-telemetry-api-key`. |
 | `GET /api/telemetry?workstationCode=WS-105&limit=50` | Returns the latest persisted telemetry observations for one workstation. |
+| `POST /api/telemetry/{sourceEventId}/predictions` | Runs the controlled Failure Prediction Agent for one persisted telemetry observation. Plant Manager and Production Supervisor only. |
 | `GET /api/failure-cases/FC-2026-0047` | Returns the complete WS-102 recovery context and audit timeline. |
 | `POST /api/failure-cases/FC-2026-0047/actions` | Executes guarded reserve, reroute approval, maintenance-stage, and notification acknowledgement commands. |
 | `POST /api/auth/login` | Starts an HTTP-only local session after a password check. |
@@ -65,6 +66,12 @@ The API records workflow events for every successful command. Inventory reservat
 `TelemetryMonitorAgent` is the first automation slice. It classifies an incoming observation as `none`, `warning`, or `critical` from versioned controlled thresholds, persists the reading and an immutable agent-run record, and adds a case audit event when an existing case is linked to that workstation. It deliberately does **not** create a failure case or make a recovery decision; those remain future agent slices.
 
 Use a stable gateway event ID for retries. The same `sourceEventId` returns the original result without a duplicate reading, agent run, or audit event. Set `TELEMETRY_INGEST_API_KEY` outside development and send it as `x-telemetry-api-key`.
+
+### Controlled failure prediction
+
+`FailurePredictionAgent` is the next isolated automation slice. It consumes one persisted telemetry observation and writes a durable component/part prediction, confidence, time-to-failure, provider version, rationale, agent run, and audit event. It links a matching existing failure case or creates a new `Prediction recorded / awaiting alerting` case. It does **not** alert stakeholders, block allocation, reserve parts, or reroute jobs.
+
+The current provider is deterministic and explicitly labelled `ControlledFailurePredictionProvider / controlled-v1`; it is not a trained ML model. Its WS-102 critical mapping deliberately matches the canonical BRD scenario: `BRG-10023`, 92% probability, and an 18-hour estimate.
 
 ## Reset a local demo database
 

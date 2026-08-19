@@ -102,6 +102,7 @@ export const agentRuns = pgTable("agent_runs", {
 }, (table) => [
   index("agent_runs_station_time_idx").on(table.workstationId, table.startedAt),
   index("agent_runs_source_event_idx").on(table.sourceEventId),
+  uniqueIndex("agent_runs_agent_source_event_idx").on(table.agentName, table.sourceEventId),
 ]);
 
 export const parts = pgTable("parts", {
@@ -127,6 +128,31 @@ export const failureCases = pgTable("failure_cases", {
   version: integer("version").notNull().default(1),
   ...timestamps,
 }, (table) => [index("failure_cases_workstation_idx").on(table.workstationId), index("failure_cases_state_idx").on(table.workflowState)]);
+
+/**
+ * A controlled prediction is a durable decision made from exactly one
+ * telemetry observation. A real ML provider can later replace the provider
+ * implementation without changing this audit and workflow boundary.
+ */
+export const failurePredictions = pgTable("failure_predictions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  telemetryReadingId: uuid("telemetry_reading_id").notNull().references(() => telemetryReadings.id, { onDelete: "restrict" }),
+  failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  workstationId: uuid("workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
+  partId: uuid("part_id").notNull().references(() => parts.id, { onDelete: "restrict" }),
+  component: varchar("component", { length: 200 }).notNull(),
+  severity: severityEnum("severity").notNull(),
+  probability: integer("probability").notNull(),
+  ttfHours: integer("ttf_hours").notNull(),
+  providerName: varchar("provider_name", { length: 120 }).notNull(),
+  providerVersion: varchar("provider_version", { length: 64 }).notNull(),
+  rationale: jsonb("rationale").notNull().$type<string[]>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("failure_predictions_telemetry_reading_idx").on(table.telemetryReadingId),
+  index("failure_predictions_case_time_idx").on(table.failureCaseId, table.createdAt),
+  index("failure_predictions_workstation_time_idx").on(table.workstationId, table.createdAt),
+]);
 
 export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),
