@@ -11,6 +11,8 @@ export const roleEnum = pgEnum("user_role", ["Plant Manager", "Production Superv
 export const telemetryAnomalySeverityEnum = pgEnum("telemetry_anomaly_severity", ["none", "warning", "critical"]);
 export const agentRunStatusEnum = pgEnum("agent_run_status", ["running", "completed", "failed"]);
 export const recoveryGraphRunStatusEnum = pgEnum("recovery_graph_run_status", ["running", "completed", "requires_intervention", "failed"]);
+export const allocationLockStateEnum = pgEnum("allocation_lock_state", ["active", "released"]);
+export const productionJobStateEnum = pgEnum("production_job_state", ["queued", "in_flight", "completed", "cancelled"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -169,6 +171,38 @@ export const failurePredictions = pgTable("failure_predictions", {
   uniqueIndex("failure_predictions_telemetry_reading_idx").on(table.telemetryReadingId),
   index("failure_predictions_case_time_idx").on(table.failureCaseId, table.createdAt),
   index("failure_predictions_workstation_time_idx").on(table.workstationId, table.createdAt),
+]);
+
+/** An authoritative server-side block on assigning new production work to one workstation. */
+export const workstationAllocationLocks = pgTable("workstation_allocation_locks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workstationId: uuid("workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }).unique(),
+  failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  failurePredictionId: uuid("failure_prediction_id").notNull().references(() => failurePredictions.id, { onDelete: "restrict" }),
+  correlationId: varchar("correlation_id", { length: 160 }).notNull(),
+  state: allocationLockStateEnum("state").notNull().default("active"),
+  policyDisposition: varchar("policy_disposition", { length: 64 }).notNull(),
+  reason: text("reason").notNull(),
+  activatedAt: timestamp("activated_at", { withTimezone: true }).notNull().defaultNow(),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  index("allocation_locks_case_idx").on(table.failureCaseId),
+  index("allocation_locks_prediction_idx").on(table.failurePredictionId),
+]);
+
+/** Persisted production work is the only supported server-side assignment boundary. */
+export const productionJobs = pgTable("production_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  externalId: varchar("external_id", { length: 64 }).notNull().unique(),
+  workstationId: uuid("workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
+  state: productionJobStateEnum("state").notNull().default("queued"),
+  rerouteEvaluationRequired: boolean("reroute_evaluation_required").notNull().default(false),
+  rerouteEvaluationReason: text("reroute_evaluation_reason"),
+  ...timestamps,
+}, (table) => [
+  index("production_jobs_station_state_idx").on(table.workstationId, table.state),
+  index("production_jobs_reroute_evaluation_idx").on(table.rerouteEvaluationRequired),
 ]);
 
 export const inventoryItems = pgTable("inventory_items", {

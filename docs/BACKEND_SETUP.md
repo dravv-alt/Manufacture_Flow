@@ -93,6 +93,12 @@ persisted telemetry -> Failure Prediction Agent -> prediction present? -> Failur
 
 Each invocation persists a `recovery_graph_runs` record and propagates its correlation ID to the existing agent-run records. A graph ending after alerting is marked `requires_intervention`, because allocation lock, resource recovery, rerouting, and delivery impact are intentionally not implemented in this phase. LangGraph is a runtime dependency here; LangSmith is not required and no LLM is invoked.
 
+### Recovery Orchestrator and allocation lock
+
+After alerting, the `RecoveryOrchestratorAgent` applies a controlled safety policy to the persisted prediction. A `critical` prediction with probability of at least `85%` and time-to-failure of at most `24h` sets the workstation to `CONTROLLED_SHUTDOWN_PENDING`, activates a durable workstation allocation lock, and flags only persisted `queued` and `in_flight` production jobs for reroute evaluation. The policy does **not** create a reroute plan or move any job.
+
+All new production-job assignments must use `assignProductionJob` in `src/lib/orchestration/service.ts`; it rejects an active locked workstation on the server. A lower-risk prediction is recorded as `AT_RISK` without creating an allocation lock.
+
 ## Reset a local demo database
 
 ```powershell
