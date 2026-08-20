@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db, queryClient } from "../src/lib/db/client";
-import { failureCases, inventoryItems, maintenanceWorkOrders, notifications, parts, plants, procurementRequests, reroutePlans, shipmentImpacts, users, workflowEvents, workstations } from "../src/lib/db/schema";
+import { failureCases, inventoryItems, maintenanceWorkOrders, notifications, parts, plants, procurementRequests, reroutePlans, shipmentImpacts, users, vendorPartCapabilities, vendors, workflowEvents, workstations } from "../src/lib/db/schema";
 
 async function one<T>(rows: T[], message: string) {
   const row = rows[0];
@@ -34,6 +34,9 @@ async function seed() {
   const ws102 = await one(await db.select().from(workstations).where(eq(workstations.code, "WS-102")), "WS-102 seed missing.");
   const ws105 = await one(await db.select().from(workstations).where(eq(workstations.code, "WS-105")), "WS-105 seed missing.");
   const bearing = await one(await db.select().from(parts).where(eq(parts.code, "BRG-10023")), "BRG-10023 seed missing.");
+  await db.insert(vendors).values({ name: "Apex Motion Components", contactEmail: "recovery@apexmotion.local", approved: true, active: true }).onConflictDoNothing();
+  const apex = await one(await db.select().from(vendors).where(eq(vendors.name, "Apex Motion Components")), "Apex vendor seed missing.");
+  await db.insert(vendorPartCapabilities).values({ vendorId: apex.id, partId: bearing.id, active: true, leadTimeHours: 8, unitCostCents: 425000, reliabilityScore: 96 }).onConflictDoNothing();
 
   await db.insert(failureCases).values({ externalId: "FC-2026-0047", workstationId: ws102.id, partId: bearing.id, severity: "critical", component: "X-Axis Servo Motor Bearing", probability: 92, ttfHours: 18, detectedAt: new Date("2026-08-10T03:14:00+05:30"), workflowState: "Recovery plan review", ownerRole: "Production Supervisor" }).onConflictDoNothing();
   const failureCase = await one(await db.select().from(failureCases).where(eq(failureCases.externalId, "FC-2026-0047")), "Failure case seed missing.");

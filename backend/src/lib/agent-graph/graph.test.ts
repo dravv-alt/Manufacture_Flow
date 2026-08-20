@@ -1,6 +1,6 @@
 import { END } from "@langchain/langgraph";
 import { describe, expect, it } from "vitest";
-import { routeAfterFailurePrediction, routeAfterRecoveryOrchestrator } from "./routing/conditions";
+import { routeAfterFailurePrediction, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "./routing/conditions";
 import { initialRecoveryGraphState } from "./state";
 
 describe("Recovery LangGraph routing", () => {
@@ -18,5 +18,11 @@ describe("Recovery LangGraph routing", () => {
     const locked = { ...initialRecoveryGraphState({ correlationId: "recovery:test-lock", graphRunId: "00000000-0000-0000-0000-000000000004", telemetrySourceEventId: "telemetry-test-lock" }), allocationLockId: "00000000-0000-0000-0000-000000000005" };
     expect(routeAfterRecoveryOrchestrator(locked)).toBe("resource_recovery");
     expect(routeAfterRecoveryOrchestrator(initialRecoveryGraphState({ correlationId: "recovery:test-at-risk", graphRunId: "00000000-0000-0000-0000-000000000006", telemetrySourceEventId: "telemetry-test-at-risk" }))).toBe(END);
+  });
+
+  it("sends only procurement-required recovery outcomes to procurement automation", () => {
+    const procurementRequired = { ...initialRecoveryGraphState({ correlationId: "recovery:test-procurement", graphRunId: "00000000-0000-0000-0000-000000000007", telemetrySourceEventId: "telemetry-test-procurement" }), resourceRecoveryOutcome: "procurement_required" as const };
+    expect(routeAfterResourceRecovery(procurementRequired)).toBe("procurement_automation");
+    expect(routeAfterResourceRecovery(initialRecoveryGraphState({ correlationId: "recovery:test-reserved", graphRunId: "00000000-0000-0000-0000-000000000008", telemetrySourceEventId: "telemetry-test-reserved" }))).toBe(END);
   });
 });

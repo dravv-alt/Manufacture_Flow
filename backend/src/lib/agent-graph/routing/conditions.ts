@@ -8,3 +8,7 @@ export function routeAfterFailurePrediction(state: RecoveryGraphState): "failure
 export function routeAfterRecoveryOrchestrator(state: RecoveryGraphState): "resource_recovery" | typeof END {
   return state.allocationLockId ? "resource_recovery" : END;
 }
+
+export function routeAfterResourceRecovery(state: RecoveryGraphState): "procurement_automation" | typeof END {
+  return state.resourceRecoveryOutcome === "procurement_required" ? "procurement_automation" : END;
+}

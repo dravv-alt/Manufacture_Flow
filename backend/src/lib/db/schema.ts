@@ -14,6 +14,8 @@ export const recoveryGraphRunStatusEnum = pgEnum("recovery_graph_run_status", ["
 export const allocationLockStateEnum = pgEnum("allocation_lock_state", ["active", "released"]);
 export const productionJobStateEnum = pgEnum("production_job_state", ["queued", "in_flight", "completed", "cancelled"]);
 export const resourceRecoveryOutcomeEnum = pgEnum("resource_recovery_outcome", ["reserved", "procurement_required"]);
+export const procurementAutomationOutcomeEnum = pgEnum("procurement_automation_outcome", ["requisition_created", "no_eligible_vendor"]);
+export const vendorNotificationStateEnum = pgEnum("vendor_notification_state", ["queued", "sent", "failed"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -132,6 +134,31 @@ export const parts = pgTable("parts", {
   unit: varchar("unit", { length: 32 }).notNull().default("unit"),
   ...timestamps,
 });
+
+/** Controlled supplier master data. Vendor approval is explicit and auditable. */
+export const vendors = pgTable("vendors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 200 }).notNull().unique(),
+  contactEmail: varchar("contact_email", { length: 320 }).notNull(),
+  approved: boolean("approved").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  ...timestamps,
+});
+
+/** Approved part-level capabilities and deterministic procurement ranking inputs. */
+export const vendorPartCapabilities = pgTable("vendor_part_capabilities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vendorId: uuid("vendor_id").notNull().references(() => vendors.id, { onDelete: "restrict" }),
+  partId: uuid("part_id").notNull().references(() => parts.id, { onDelete: "restrict" }),
+  active: boolean("active").notNull().default(true),
+  leadTimeHours: integer("lead_time_hours").notNull(),
+  unitCostCents: integer("unit_cost_cents").notNull(),
+  reliabilityScore: integer("reliability_score").notNull(),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("vendor_part_capability_idx").on(table.vendorId, table.partId),
+  index("vendor_part_capabilities_part_idx").on(table.partId),
+]);
 
 export const failureCases = pgTable("failure_cases", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -269,7 +296,34 @@ export const procurementRequests = pgTable("procurement_requests", {
   state: procurementStateEnum("state").notNull().default("draft"),
   requiredBy: timestamp("required_by", { withTimezone: true }).notNull(),
   ...timestamps,
-});
+}, (table) => [uniqueIndex("procurement_requests_case_part_idx").on(table.failureCaseId, table.partId)]);
+
+/** Durable procurement decision from one procurement-required resource recovery result. */
+export const procurementAutomationResults = pgTable("procurement_automation_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  resourceRecoveryResultId: uuid("resource_recovery_result_id").notNull().references(() => resourceRecoveryResults.id, { onDelete: "restrict" }).unique(),
+  failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  selectedVendorId: uuid("selected_vendor_id").references(() => vendors.id, { onDelete: "restrict" }),
+  procurementRequestId: uuid("procurement_request_id").references(() => procurementRequests.id, { onDelete: "restrict" }),
+  correlationId: varchar("correlation_id", { length: 160 }).notNull(),
+  outcome: procurementAutomationOutcomeEnum("outcome").notNull(),
+  rankedOptions: jsonb("ranked_options").notNull().$type<Array<{ vendorId: string; vendorName: string; leadTimeHours: number; unitCostCents: number; reliabilityScore: number }>>(),
+  reason: text("reason").notNull(),
+  ...timestamps,
+}, (table) => [index("procurement_automation_results_case_idx").on(table.failureCaseId)]);
+
+/** Controlled vendor handoff record. It is queued for delivery; no external dispatch is performed in this slice. */
+export const vendorNotifications = pgTable("vendor_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  procurementRequestId: uuid("procurement_request_id").notNull().references(() => procurementRequests.id, { onDelete: "cascade" }).unique(),
+  vendorId: uuid("vendor_id").notNull().references(() => vendors.id, { onDelete: "restrict" }),
+  recipientEmail: varchar("recipient_email", { length: 320 }).notNull(),
+  ccRoles: jsonb("cc_roles").notNull().$type<string[]>(),
+  body: text("body").notNull(),
+  state: vendorNotificationStateEnum("state").notNull().default("queued"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [index("vendor_notifications_vendor_state_idx").on(table.vendorId, table.state)]);
 
 export const procurementMessages = pgTable("procurement_messages", {
   id: uuid("id").primaryKey().defaultRandom(),

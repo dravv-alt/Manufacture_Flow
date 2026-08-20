@@ -71,6 +71,13 @@
       "when": 1787166982409,
       "tag": "0009_crazy_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787235468640,
+      "tag": "0010_flat_newton_destine",
+      "breakpoints": true
     }
   ]
 }

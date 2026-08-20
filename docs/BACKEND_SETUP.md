@@ -105,6 +105,12 @@ Only an allocation-locked recovery continues to `ResourceRecoveryAgent`. The age
 
 Every run persists one `resource_recovery_results` record. `reserved` links to its inventory item and `inventory_reservations` row; `procurement_required` is a durable handoff result only—it does not create a purchase requisition, contact a vendor, or advance any downstream workflow.
 
+### Resource Recovery Agent — procurement automation
+
+Only a durable `procurement_required` result under the same graph correlation continues to `ProcurementAutomationAgent`. It evaluates approved, active vendor capabilities for the required part and ranks valid suppliers by lead time, cost, reliability, then vendor name. The selected supplier produces exactly one durable purchase requisition and one queued vendor notification with `Warehouse Team` and `Procurement Team` CC routing.
+
+When no approved eligible vendor exists, the agent records `no_eligible_vendor` and leaves the workflow at `REQUIRES_INTERVENTION`; it does not create a PR or vendor notification. Notification delivery, maintenance, rerouting, recovery ETA, and shipment handling are intentionally outside this slice.
+
 ## Reset a local demo database
 
 ```powershell
