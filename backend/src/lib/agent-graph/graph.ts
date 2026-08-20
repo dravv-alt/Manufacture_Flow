@@ -5,9 +5,10 @@ import { failureAlertingNode } from "@/lib/agent-graph/nodes/failure-alerting";
 import { recoveryOrchestratorNode } from "@/lib/agent-graph/nodes/recovery-orchestrator";
 import { resourceRecoveryNode } from "@/lib/agent-graph/nodes/resource-recovery";
 import { procurementAutomationNode } from "@/lib/agent-graph/nodes/procurement-automation";
+import { maintenanceWorkOrderNode } from "@/lib/agent-graph/nodes/maintenance-work-order";
 import { failurePredictionNode } from "@/lib/agent-graph/nodes/failure-prediction";
 import { RecoveryGraphInputNotFoundError, telemetryMonitorNode } from "@/lib/agent-graph/nodes/telemetry";
-import { routeAfterFailurePrediction, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "@/lib/agent-graph/routing/conditions";
+import { routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "@/lib/agent-graph/routing/conditions";
 import { initialRecoveryGraphState, RecoveryGraphStateAnnotation, type RecoveryGraphState } from "@/lib/agent-graph/state";
 import { db } from "@/lib/db/client";
 import { recoveryGraphRuns } from "@/lib/db/schema";
@@ -19,13 +20,15 @@ export const recoveryGraph = new StateGraph(RecoveryGraphStateAnnotation)
   .addNode("recovery_orchestrator", recoveryOrchestratorNode)
   .addNode("resource_recovery", resourceRecoveryNode)
   .addNode("procurement_automation", procurementAutomationNode)
+  .addNode("maintenance_work_order", maintenanceWorkOrderNode)
   .addEdge(START, "telemetry_monitor")
   .addEdge("telemetry_monitor", "failure_prediction")
   .addConditionalEdges("failure_prediction", routeAfterFailurePrediction)
   .addEdge("failure_alerting", "recovery_orchestrator")
   .addConditionalEdges("recovery_orchestrator", routeAfterRecoveryOrchestrator)
   .addConditionalEdges("resource_recovery", routeAfterResourceRecovery)
-  .addEdge("procurement_automation", END)
+  .addConditionalEdges("procurement_automation", routeAfterProcurementAutomation)
+  .addEdge("maintenance_work_order", END)
   .compile({ name: "manufacturing-recovery-graph" });
 
 export class RecoveryGraphRunNotFoundError extends Error {}

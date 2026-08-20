@@ -9,6 +9,11 @@ export function routeAfterRecoveryOrchestrator(state: RecoveryGraphState): "reso
   return state.allocationLockId ? "resource_recovery" : END;
 }
 
-export function routeAfterResourceRecovery(state: RecoveryGraphState): "procurement_automation" | typeof END {
-  return state.resourceRecoveryOutcome === "procurement_required" ? "procurement_automation" : END;
+export function routeAfterResourceRecovery(state: RecoveryGraphState): "procurement_automation" | "maintenance_work_order" | typeof END {
+  if (state.resourceRecoveryOutcome === "procurement_required") return "procurement_automation";
+  return state.resourceRecoveryOutcome === "reserved" ? "maintenance_work_order" : END;
+}
+
+export function routeAfterProcurementAutomation(state: RecoveryGraphState): "maintenance_work_order" | typeof END {
+  return state.procurementAutomationOutcome === "requisition_created" ? "maintenance_work_order" : END;
 }

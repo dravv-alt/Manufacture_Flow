@@ -1,6 +1,6 @@
 import { END } from "@langchain/langgraph";
 import { describe, expect, it } from "vitest";
-import { routeAfterFailurePrediction, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "./routing/conditions";
+import { routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "./routing/conditions";
 import { initialRecoveryGraphState } from "./state";
 
 describe("Recovery LangGraph routing", () => {
@@ -24,5 +24,13 @@ describe("Recovery LangGraph routing", () => {
     const procurementRequired = { ...initialRecoveryGraphState({ correlationId: "recovery:test-procurement", graphRunId: "00000000-0000-0000-0000-000000000007", telemetrySourceEventId: "telemetry-test-procurement" }), resourceRecoveryOutcome: "procurement_required" as const };
     expect(routeAfterResourceRecovery(procurementRequired)).toBe("procurement_automation");
     expect(routeAfterResourceRecovery(initialRecoveryGraphState({ correlationId: "recovery:test-reserved", graphRunId: "00000000-0000-0000-0000-000000000008", telemetrySourceEventId: "telemetry-test-reserved" }))).toBe(END);
+  });
+
+  it("routes local spares and successful procurement to maintenance work-order creation", () => {
+    const localSpare = { ...initialRecoveryGraphState({ correlationId: "recovery:test-local-spare", graphRunId: "00000000-0000-0000-0000-000000000009", telemetrySourceEventId: "telemetry-test-local-spare" }), resourceRecoveryOutcome: "reserved" as const };
+    const successfulProcurement = { ...initialRecoveryGraphState({ correlationId: "recovery:test-procurement-success", graphRunId: "00000000-0000-0000-0000-000000000010", telemetrySourceEventId: "telemetry-test-procurement-success" }), procurementAutomationOutcome: "requisition_created" as const };
+    expect(routeAfterResourceRecovery(localSpare)).toBe("maintenance_work_order");
+    expect(routeAfterProcurementAutomation(successfulProcurement)).toBe("maintenance_work_order");
+    expect(routeAfterProcurementAutomation(initialRecoveryGraphState({ correlationId: "recovery:test-no-vendor", graphRunId: "00000000-0000-0000-0000-000000000011", telemetrySourceEventId: "telemetry-test-no-vendor" }))).toBe(END);
   });
 });

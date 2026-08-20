@@ -111,6 +111,12 @@ Only a durable `procurement_required` result under the same graph correlation co
 
 When no approved eligible vendor exists, the agent records `no_eligible_vendor` and leaves the workflow at `REQUIRES_INTERVENTION`; it does not create a PR or vendor notification. Notification delivery, maintenance, rerouting, recovery ETA, and shipment handling are intentionally outside this slice.
 
+### Resource Recovery Agent — maintenance work-order creation
+
+`MaintenanceWorkOrderAgent` runs after either a successful local-spare reservation or a successful procurement requisition under the same recovery correlation. It creates one linked critical work order containing workstation, diagnosis, required part, deterministic checklist, and a planning window. The window is planning metadata only—not a calculated recovery ETA—and requires operational confirmation.
+
+The work order is idempotently linked to its `resource_recovery_results` record. No maintenance execution, recovery calculation, rerouting, shipment change, or external contact occurs in this slice.
+
 ## Reset a local demo database
 
 ```powershell
