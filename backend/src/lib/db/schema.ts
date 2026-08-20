@@ -227,11 +227,39 @@ export const productionJobs = pgTable("production_jobs", {
   state: productionJobStateEnum("state").notNull().default("queued"),
   rerouteEvaluationRequired: boolean("reroute_evaluation_required").notNull().default(false),
   rerouteEvaluationReason: text("reroute_evaluation_reason"),
+  operationCode: varchar("operation_code", { length: 64 }).notNull().default("GENERAL"),
+  toolingCode: varchar("tooling_code", { length: 64 }).notNull().default("STANDARD"),
+  requiredSkill: varchar("required_skill", { length: 64 }).notNull().default("OPERATOR"),
+  estimatedLoadPercent: integer("estimated_load_percent").notNull().default(10),
   ...timestamps,
 }, (table) => [
   index("production_jobs_station_state_idx").on(table.workstationId, table.state),
   index("production_jobs_reroute_evaluation_idx").on(table.rerouteEvaluationRequired),
 ]);
+
+/** Controlled routing capability master data; external MES/APS can replace this provider later. */
+export const workstationCapabilities = pgTable("workstation_capabilities", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workstationId: uuid("workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
+  operationCode: varchar("operation_code", { length: 64 }).notNull(),
+  toolingCode: varchar("tooling_code", { length: 64 }).notNull(),
+  qualifiedSkill: varchar("qualified_skill", { length: 64 }).notNull(),
+  active: boolean("active").notNull().default(true),
+  ...timestamps,
+}, (table) => [uniqueIndex("workstation_capability_match_idx").on(table.workstationId, table.operationCode, table.toolingCode, table.qualifiedSkill), index("workstation_capability_operation_idx").on(table.operationCode)]);
+
+/** One durable, idempotent routing outcome per production job for a recovery incident. */
+export const rerouteDecisions = pgTable("reroute_decisions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  productionJobId: uuid("production_job_id").notNull().references(() => productionJobs.id, { onDelete: "restrict" }).unique(),
+  sourceWorkstationId: uuid("source_workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
+  targetWorkstationId: uuid("target_workstation_id").references(() => workstations.id, { onDelete: "restrict" }),
+  correlationId: varchar("correlation_id", { length: 160 }).notNull(),
+  outcome: varchar("outcome", { length: 64 }).notNull(),
+  rationale: jsonb("rationale").notNull().$type<Record<string, unknown>>(),
+  ...timestamps,
+}, (table) => [index("reroute_decisions_case_idx").on(table.failureCaseId), index("reroute_decisions_correlation_idx").on(table.correlationId)]);
 
 export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),

@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed-db.ts",
-    "validate:recovery-time": "tsx scripts/validate-recovery-time.ts"
+    "validate:recovery-time": "tsx scripts/validate-recovery-time.ts",
+    "validate:production-rerouting": "tsx scripts/validate-production-rerouting.ts"
   }
 }

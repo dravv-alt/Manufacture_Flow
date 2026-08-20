@@ -7,6 +7,7 @@ import { resourceRecoveryNode } from "@/lib/agent-graph/nodes/resource-recovery"
 import { procurementAutomationNode } from "@/lib/agent-graph/nodes/procurement-automation";
 import { maintenanceWorkOrderNode } from "@/lib/agent-graph/nodes/maintenance-work-order";
 import { recoveryTimeEstimationNode } from "@/lib/agent-graph/nodes/recovery-time-estimation";
+import { productionReroutingNode } from "@/lib/agent-graph/nodes/production-rerouting";
 import { failurePredictionNode } from "@/lib/agent-graph/nodes/failure-prediction";
 import { RecoveryGraphInputNotFoundError, telemetryMonitorNode } from "@/lib/agent-graph/nodes/telemetry";
 import { routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "@/lib/agent-graph/routing/conditions";
@@ -23,6 +24,7 @@ export const recoveryGraph = new StateGraph(RecoveryGraphStateAnnotation)
   .addNode("procurement_automation", procurementAutomationNode)
   .addNode("maintenance_work_order", maintenanceWorkOrderNode)
   .addNode("recovery_time_estimation", recoveryTimeEstimationNode)
+  .addNode("production_rerouting", productionReroutingNode)
   .addEdge(START, "telemetry_monitor")
   .addEdge("telemetry_monitor", "failure_prediction")
   .addConditionalEdges("failure_prediction", routeAfterFailurePrediction)
@@ -31,7 +33,8 @@ export const recoveryGraph = new StateGraph(RecoveryGraphStateAnnotation)
   .addConditionalEdges("resource_recovery", routeAfterResourceRecovery)
   .addConditionalEdges("procurement_automation", routeAfterProcurementAutomation)
   .addEdge("maintenance_work_order", "recovery_time_estimation")
-  .addEdge("recovery_time_estimation", END)
+  .addEdge("recovery_time_estimation", "production_rerouting")
+  .addEdge("production_rerouting", END)
   .compile({ name: "manufacturing-recovery-graph" });
 
 export class RecoveryGraphRunNotFoundError extends Error {}
