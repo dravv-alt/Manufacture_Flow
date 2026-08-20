@@ -12,6 +12,7 @@
     "db:seed": "tsx scripts/seed-db.ts",
     "validate:recovery-time": "tsx scripts/validate-recovery-time.ts",
     "validate:production-rerouting": "tsx scripts/validate-production-rerouting.ts",
-    "validate:delivery-impact": "tsx scripts/validate-delivery-impact.ts"
+    "validate:delivery-impact": "tsx scripts/validate-delivery-impact.ts",
+    "validate:final-notifications": "tsx scripts/validate-final-stakeholder-notifications.ts"
   }
 }

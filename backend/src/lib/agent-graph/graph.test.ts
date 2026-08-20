@@ -1,9 +1,13 @@
 import { END } from "@langchain/langgraph";
 import { describe, expect, it } from "vitest";
-import { routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "./routing/conditions";
+import { routeAfterDeliveryImpact, routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "./routing/conditions";
 import { initialRecoveryGraphState } from "./state";
 
 describe("Recovery LangGraph routing", () => {
+  it("routes Delivery Impact to final stakeholder notifications", () => {
+    const state = { ...initialRecoveryGraphState({ correlationId: "recovery:test-final-notification", graphRunId: "00000000-0000-0000-0000-000000000012", telemetrySourceEventId: "telemetry-test-final-notification" }), deliveryImpactOutcome: "calculated" as const };
+    expect(routeAfterDeliveryImpact(state)).toBe("final_stakeholder_notification");
+  });
   it("routes a persisted prediction to failure alerting", () => {
     const state = { ...initialRecoveryGraphState({ correlationId: "recovery:test-prediction", graphRunId: "00000000-0000-0000-0000-000000000001", telemetrySourceEventId: "telemetry-test-prediction" }), predictionId: "00000000-0000-0000-0000-000000000002" };
     expect(routeAfterFailurePrediction(state)).toBe("failure_alerting");

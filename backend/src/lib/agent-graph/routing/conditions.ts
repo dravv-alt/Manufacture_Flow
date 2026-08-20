@@ -17,3 +17,7 @@ export function routeAfterResourceRecovery(state: RecoveryGraphState): "procurem
 export function routeAfterProcurementAutomation(state: RecoveryGraphState): "maintenance_work_order" | typeof END {
   return state.procurementAutomationOutcome === "requisition_created" ? "maintenance_work_order" : END;
 }
+
+export function routeAfterDeliveryImpact(_state: RecoveryGraphState): "final_stakeholder_notification" {
+  return "final_stakeholder_notification";
+}

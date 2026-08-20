@@ -9,9 +9,10 @@ import { maintenanceWorkOrderNode } from "@/lib/agent-graph/nodes/maintenance-wo
 import { recoveryTimeEstimationNode } from "@/lib/agent-graph/nodes/recovery-time-estimation";
 import { productionReroutingNode } from "@/lib/agent-graph/nodes/production-rerouting";
 import { deliveryImpactNode } from "@/lib/agent-graph/nodes/delivery-impact";
+import { finalStakeholderNotificationNode } from "@/lib/agent-graph/nodes/final-stakeholder-notification";
 import { failurePredictionNode } from "@/lib/agent-graph/nodes/failure-prediction";
 import { RecoveryGraphInputNotFoundError, telemetryMonitorNode } from "@/lib/agent-graph/nodes/telemetry";
-import { routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "@/lib/agent-graph/routing/conditions";
+import { routeAfterDeliveryImpact, routeAfterFailurePrediction, routeAfterProcurementAutomation, routeAfterRecoveryOrchestrator, routeAfterResourceRecovery } from "@/lib/agent-graph/routing/conditions";
 import { initialRecoveryGraphState, RecoveryGraphStateAnnotation, type RecoveryGraphState } from "@/lib/agent-graph/state";
 import { db } from "@/lib/db/client";
 import { recoveryGraphRuns } from "@/lib/db/schema";
@@ -27,6 +28,7 @@ export const recoveryGraph = new StateGraph(RecoveryGraphStateAnnotation)
   .addNode("recovery_time_estimation", recoveryTimeEstimationNode)
   .addNode("production_rerouting", productionReroutingNode)
   .addNode("delivery_impact", deliveryImpactNode)
+  .addNode("final_stakeholder_notification", finalStakeholderNotificationNode)
   .addEdge(START, "telemetry_monitor")
   .addEdge("telemetry_monitor", "failure_prediction")
   .addConditionalEdges("failure_prediction", routeAfterFailurePrediction)
@@ -37,7 +39,8 @@ export const recoveryGraph = new StateGraph(RecoveryGraphStateAnnotation)
   .addEdge("maintenance_work_order", "recovery_time_estimation")
   .addEdge("recovery_time_estimation", "production_rerouting")
   .addEdge("production_rerouting", "delivery_impact")
-  .addEdge("delivery_impact", END)
+  .addConditionalEdges("delivery_impact", routeAfterDeliveryImpact)
+  .addEdge("final_stakeholder_notification", END)
   .compile({ name: "manufacturing-recovery-graph" });
 
 export class RecoveryGraphRunNotFoundError extends Error {}
