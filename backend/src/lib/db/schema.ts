@@ -353,6 +353,31 @@ export const maintenanceWorkOrders = pgTable("maintenance_work_orders", {
   ...timestamps,
 });
 
+/**
+ * Append-only recovery planning decisions. A changed, material planning input
+ * creates a new revision instead of rewriting the operational estimate that
+ * was previously issued.
+ */
+export const recoveryTimeEstimates = pgTable("recovery_time_estimates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
+  maintenanceWorkOrderId: uuid("maintenance_work_order_id").notNull().references(() => maintenanceWorkOrders.id, { onDelete: "restrict" }),
+  correlationId: varchar("correlation_id", { length: 160 }).notNull(),
+  revision: integer("revision").notNull(),
+  scenario: varchar("scenario", { length: 64 }).notNull(),
+  calculationVersion: varchar("calculation_version", { length: 64 }).notNull(),
+  inputHash: varchar("input_hash", { length: 64 }).notNull(),
+  calculationInputs: jsonb("calculation_inputs").notNull().$type<Record<string, unknown>>(),
+  expectedRecoveryAt: timestamp("expected_recovery_at", { withTimezone: true }).notNull(),
+  durationMinutes: integer("duration_minutes").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("recovery_time_estimates_work_order_input_idx").on(table.maintenanceWorkOrderId, table.inputHash),
+  uniqueIndex("recovery_time_estimates_work_order_revision_idx").on(table.maintenanceWorkOrderId, table.revision),
+  index("recovery_time_estimates_case_time_idx").on(table.failureCaseId, table.createdAt),
+  index("recovery_time_estimates_correlation_idx").on(table.correlationId),
+]);
+
 export const shipmentImpacts = pgTable("shipment_impacts", {
   id: uuid("id").primaryKey().defaultRandom(),
   externalId: varchar("external_id", { length: 64 }).notNull().unique(),

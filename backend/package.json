@@ -9,6 +9,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx scripts/seed-db.ts"
+    "db:seed": "tsx scripts/seed-db.ts",
+    "validate:recovery-time": "tsx scripts/validate-recovery-time.ts"
   }
 }
