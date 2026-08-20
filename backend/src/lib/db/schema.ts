@@ -16,6 +16,7 @@ export const productionJobStateEnum = pgEnum("production_job_state", ["queued", 
 export const resourceRecoveryOutcomeEnum = pgEnum("resource_recovery_outcome", ["reserved", "procurement_required"]);
 export const procurementAutomationOutcomeEnum = pgEnum("procurement_automation_outcome", ["requisition_created", "no_eligible_vendor"]);
 export const vendorNotificationStateEnum = pgEnum("vendor_notification_state", ["queued", "sent", "failed"]);
+export const deliveryImpactClassificationEnum = pgEnum("delivery_impact_classification", ["ON_TIME", "AT_RISK", "DELAYED"]);
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -414,8 +415,33 @@ export const shipmentImpacts = pgTable("shipment_impacts", {
   revisedEta: timestamp("revised_eta", { withTimezone: true }).notNull(),
   deltaHours: integer("delta_hours").notNull(),
   state: shipmentStateEnum("state").notNull().default("revised"),
+  correlationId: varchar("correlation_id", { length: 160 }),
+  recoveryTimeEstimateId: uuid("recovery_time_estimate_id").references(() => recoveryTimeEstimates.id, { onDelete: "restrict" }),
+  shipmentCommitmentId: uuid("shipment_commitment_id").references(() => shipmentCommitments.id, { onDelete: "restrict" }),
+  rerouteDecisionIds: jsonb("reroute_decision_ids").$type<string[]>(),
+  reroutePlanIds: jsonb("reroute_plan_ids").$type<string[]>(),
+  affectedJobIds: jsonb("affected_job_ids").$type<string[]>(),
+  originalCommittedAt: timestamp("original_committed_at", { withTimezone: true }),
+  revisedProjectedAt: timestamp("revised_projected_at", { withTimezone: true }),
+  classification: deliveryImpactClassificationEnum("classification"),
+  delayMinutes: integer("delay_minutes"),
+  rationale: jsonb("rationale").$type<Record<string, unknown>>(),
   ...timestamps,
-});
+}, (table) => [
+  uniqueIndex("shipment_impacts_correlation_commitment_idx").on(table.correlationId, table.shipmentCommitmentId),
+  index("shipment_impacts_correlation_idx").on(table.correlationId),
+]);
+
+/** Controlled shipment commitments; an ERP adapter can replace this repository boundary. */
+export const shipmentCommitments = pgTable("shipment_commitments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  externalId: varchar("external_id", { length: 64 }).notNull().unique(),
+  productionJobIds: jsonb("production_job_ids").notNull().$type<string[]>(),
+  originalCommittedAt: timestamp("original_committed_at", { withTimezone: true }).notNull(),
+  postCompletionMinutes: integer("post_completion_minutes").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  ...timestamps,
+}, (table) => [index("shipment_commitments_active_idx").on(table.active)]);
 
 export const notifications = pgTable("notifications", {
   id: uuid("id").primaryKey().defaultRandom(),
