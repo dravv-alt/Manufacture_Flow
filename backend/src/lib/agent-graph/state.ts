@@ -1,6 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 
-export type RecoveryWorkflowStatus = "MONITORING" | "FAILURE_PREDICTED" | "RECOVERY_RUNNING" | "REQUIRES_INTERVENTION" | "RECOVERY_VALIDATION" | "COMPLETED" | "FAILED";
+export type RecoveryWorkflowStatus = "MONITORING" | "FAILURE_PREDICTED" | "RECOVERY_RUNNING" | "REQUIRES_INTERVENTION" | "RECOVERY_VALIDATION" | "AWAITING_MAINTENANCE_EXECUTION" | "RECOVERED" | "COMPLETED" | "FAILED";
 
 export type RecoveryGraphError = { node: string; message: string; occurredAt: string };
 

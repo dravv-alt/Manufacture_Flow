@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { failureCases, inventoryItems, inventoryReservations, maintenanceWorkOrders, notificationAttempts, notifications, parts, procurementMessages, procurementRequests, reroutePlans, shipmentImpacts, workstations, workflowEvents } from "@/lib/db/schema";
+import { applyMaintenanceExecutionAction, isMaintenanceExecutionAction, MaintenanceExecutionConflictError, MaintenanceExecutionNotFoundError, type MaintenanceExecutionAction } from "@/lib/maintenance-execution/service";
 
 export type WorkflowAction =
   | { type: "reserve_part"; actor: string; quantity: number }
@@ -10,7 +11,8 @@ export type WorkflowAction =
   | { type: "retry_notification"; actor: string; notificationId: string }
   | { type: "set_procurement_state"; actor: string; state: "draft" | "sent" | "acknowledged" | "delayed" }
   | { type: "record_procurement_note"; actor: string; note: string }
-  | { type: "set_shipment_state"; actor: string; state: "no-impact" | "revised" | "delayed" | "notification-pending" | "notified" | "failed" };
+  | { type: "set_shipment_state"; actor: string; state: "no-impact" | "revised" | "delayed" | "notification-pending" | "notified" | "failed" }
+  | MaintenanceExecutionAction;
 
 export class OperationNotFoundError extends Error {}
 export class OperationConflictError extends Error {}
@@ -68,6 +70,15 @@ export async function getCaseDetail(externalId: string) {
 }
 
 export async function applyWorkflowAction(externalId: string, action: WorkflowAction) {
+  if (isMaintenanceExecutionAction(action)) {
+    try { return await applyMaintenanceExecutionAction(externalId, action); }
+    catch (error) {
+      if (error instanceof OperationNotFoundError || error instanceof OperationConflictError) throw error;
+      if (error instanceof MaintenanceExecutionNotFoundError) throw new OperationNotFoundError(error.message);
+      if (error instanceof MaintenanceExecutionConflictError) throw new OperationConflictError(error.message);
+      throw error;
+    }
+  }
   return db.transaction(async (tx) => {
     const [failureCase] = await tx.select().from(failureCases).where(eq(failureCases.externalId, externalId)).limit(1);
     if (!failureCase) throw new OperationNotFoundError(`Failure case ${externalId} was not found.`);
@@ -98,7 +109,7 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
       const [workOrder] = await tx.select().from(maintenanceWorkOrders).where(eq(maintenanceWorkOrders.failureCaseId, failureCase.id)).limit(1);
       if (!workOrder) throw new OperationNotFoundError("No maintenance work order exists for this failure case.");
       if (workOrder.stage !== action.expectedStage) throw new OperationConflictError(`Maintenance stage changed from ${action.expectedStage} to ${workOrder.stage}; refresh before trying again.`);
-      if (workOrder.stage >= 7) throw new OperationConflictError("Maintenance work order is already returned to service.");
+      if (workOrder.stage >= 3) throw new OperationConflictError("Physical maintenance execution requires the controlled maintenance commands; generic advancement stops at the planned stage.");
       const [updated] = await tx.update(maintenanceWorkOrders).set({ stage: workOrder.stage + 1, updatedAt: new Date() }).where(eq(maintenanceWorkOrders.id, workOrder.id)).returning();
       await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "maintenance_work_order", entityId: workOrder.id, eventType: "maintenance_stage_advanced", actor: action.actor, payload: { fromStage: workOrder.stage, toStage: updated.stage } });
       return { action: action.type, workOrder: updated };
