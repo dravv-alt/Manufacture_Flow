@@ -1,5 +1,5 @@
 import { NotificationsControl } from "@/components/operations/NotificationsControl";
 
 export default function NotificationsPage() {
-  return <NotificationsControl />;
+  return <div data-tour-id="notification-result"><NotificationsControl /></div>;
 }

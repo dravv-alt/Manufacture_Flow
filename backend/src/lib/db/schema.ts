@@ -136,6 +136,33 @@ export const parts = pgTable("parts", {
   ...timestamps,
 });
 
+/** Controlled plant-performance simulation snapshot derived from one telemetry observation. */
+export const machineMetricSnapshots = pgTable("machine_metric_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workstationId: uuid("workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
+  telemetryReadingId: uuid("telemetry_reading_id").notNull().references(() => telemetryReadings.id, { onDelete: "restrict" }),
+  sourceEventId: varchar("source_event_id", { length: 128 }).notNull(),
+  observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+  powerKw: doublePrecision("power_kw").notNull(),
+  availabilityPercent: doublePrecision("availability_percent").notNull(),
+  performancePercent: doublePrecision("performance_percent").notNull(),
+  qualityPercent: doublePrecision("quality_percent").notNull(),
+  oeePercent: doublePrecision("oee_percent").notNull(),
+  cycleTimeSeconds: doublePrecision("cycle_time_seconds").notNull(),
+  outputPerHour: integer("output_per_hour").notNull(),
+  defectRatePercent: doublePrecision("defect_rate_percent").notNull(),
+  estimatedRulDays: integer("estimated_rul_days").notNull(),
+  operatorId: varchar("operator_id", { length: 64 }).notNull(),
+  firmwareVersion: varchar("firmware_version", { length: 64 }).notNull(),
+  networkPingMs: integer("network_ping_ms").notNull(),
+  lastMaintenanceAt: timestamp("last_maintenance_at", { withTimezone: true }).notNull(),
+  nextMaintenanceAt: timestamp("next_maintenance_at", { withTimezone: true }).notNull(),
+}, (table) => [
+  uniqueIndex("machine_metric_snapshots_source_event_idx").on(table.sourceEventId),
+  uniqueIndex("machine_metric_snapshots_telemetry_idx").on(table.telemetryReadingId),
+  index("machine_metric_snapshots_station_observed_idx").on(table.workstationId, table.observedAt),
+]);
+
 /** Controlled supplier master data. Vendor approval is explicit and auditable. */
 export const vendors = pgTable("vendors", {
   id: uuid("id").primaryKey().defaultRandom(),

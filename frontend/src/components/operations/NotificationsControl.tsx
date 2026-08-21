@@ -1,44 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Check, CircleAlert, MailWarning, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOperations } from "@/contexts/OperationsContext";
-import { apiFetch } from "@/lib/api-client";
-import { demoNotifications, type DemoNotification, type NotificationStatus } from "@/demo-data/ws102-scenario";
+import type { DemoNotification, NotificationStatus } from "@/demo-data/ws102-scenario";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | NotificationStatus;
-type PersistedNotification = { id: string; subject: string; recipientRole: string; channel: string; state: NotificationStatus };
 type NotificationAttempt = { id: string; notificationId: string; attemptNumber: number; state: NotificationStatus; actor: string; detail: string; occurredAt: string };
 
 export function NotificationsControl() {
   const [filter, setFilter] = useState<Filter>("all");
-  const [notices, setNotices] = useState<DemoNotification[]>(() => [...demoNotifications]);
-  const [attempts, setAttempts] = useState<NotificationAttempt[]>([]);
-  const { runWorkflowCommand, pendingCommand, commandError, clearCommandError } = useOperations();
-
-  useEffect(() => {
-    let active = true;
-    void apiFetch("/api/failure-cases/FC-2026-0047", { cache: "no-store" })
-      .then(async (response) => response.ok ? response.json() as Promise<{ notifications: PersistedNotification[]; notificationAttempts: NotificationAttempt[] }> : null)
-      .then((payload) => {
-        if (!active || !payload?.notifications.length) return;
-        setNotices(payload.notifications.map((notice) => ({
-          id: notice.id,
-          title: notice.subject,
-          detail: `${notice.recipientRole} via ${notice.channel.replace("_", " ")}.`,
-          status: notice.state,
-          href: "/failure/FC-2026-0047",
-        })));
-        setAttempts(payload.notificationAttempts);
-      })
-      .catch(() => { /* Demo notification fixtures remain visible if the API is offline. */ });
-    return () => { active = false; };
-  }, [pendingCommand]);
+  const { runWorkflowCommand, pendingCommand, commandError, clearCommandError, activeCase } = useOperations();
+  const notices = useMemo<DemoNotification[]>(() => activeCase?.notifications.map((notice) => ({ id: notice.id, title: notice.subject, detail: `${notice.recipientRole} via ${notice.channel.replace("_", " ")}.`, status: notice.state as NotificationStatus, href: `/failure/${activeCase.failureCase.externalId}` })) ?? [], [activeCase]);
+  const attempts: NotificationAttempt[] = activeCase?.notificationAttempts ?? [];
 
   const visible = useMemo(() => filter === "all" ? notices : notices.filter((notice) => notice.status === filter), [filter, notices]);
   const update = async (notice: DemoNotification, status: NotificationStatus) => {

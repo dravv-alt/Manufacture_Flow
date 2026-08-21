@@ -5,6 +5,8 @@ import { OperationsProvider } from "@/contexts/OperationsContext";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Manrope } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { WorkflowTabs } from "@/components/shell/WorkflowTabs";
+import { StoryModeController } from "@/components/story/StoryModeController";
+import { RuntimeBanner } from "@/components/story/RuntimeBanner";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -46,6 +48,8 @@ export default function RootLayout({
       </head>
       <body>
         <OperationsProvider>
+          <RuntimeBanner />
+          <StoryModeController />
           <AppShell><WorkflowTabs />{children}</AppShell>
         </OperationsProvider>
       </body>

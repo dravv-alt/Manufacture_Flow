@@ -24,11 +24,12 @@ export function WarehouseControl() {
   // REDUNDANT LOCAL STATE — retained for review; inventory decisions now persist in OperationsContext.
   // const [available, setAvailable] = useState(true);
   // const [reserved, setReserved] = useState(false);
-  const { state, update, runWorkflowCommand, pendingCommand, commandError, clearCommandError } = useOperations();
-  const available = state.inventoryState === "available";
+  const { state, activeCase, runWorkflowCommand, pendingCommand, commandError, clearCommandError } = useOperations();
+  const inventory = activeCase?.inventory[0];
+  const available = Boolean(inventory && inventory.onHand - inventory.reserved > 0);
   const reserved = state.bearingReserved;
-  const stock = available ? 3 : 0;
-  const reservedCount = reserved ? 1 : 0;
+  const stock = inventory?.onHand ?? 0;
+  const reservedCount = inventory?.reserved ?? 0;
   const remaining = stock - reservedCount;
 
   return (
@@ -36,7 +37,7 @@ export function WarehouseControl() {
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="flex flex-col gap-5 border-b border-border pb-7">
           <div className="flex flex-wrap items-center gap-3"><Badge variant="outline">CONTROLLED DATA</Badge><span className="font-mono text-xs text-muted-foreground">INVENTORY CONTROL / FAILURE CASE FC-2026-0047</span></div>
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Make the spare decision explicit.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">Reserve BRG-10023 for the WS-102 bearing replacement or route the unavailable branch to a procurement draft.</p></div><Button variant="outline" onClick={() => update({ inventoryState: available ? "unavailable" : "available", inventoryAvailable: !available, bearingReserved: false, recoveryScenario: available ? "vendor" : "local" })}>{available ? "Simulate unavailable stock" : "Restore available stock"}</Button></div>
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Make the spare decision explicit.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">Reserve BRG-10023 for the WS-102 bearing replacement or route the unavailable branch to a procurement draft.</p></div><Badge variant="outline">PERSISTED INVENTORY</Badge></div>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">

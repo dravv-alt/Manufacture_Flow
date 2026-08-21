@@ -11,9 +11,9 @@ migrations, and controlled demo data in one project.
    `run-project.bat`.
 3. Open [http://localhost:3000](http://localhost:3000).
 
-The launcher starts PostgreSQL on port 5434, applies migrations, seeds the
-controlled scenario, and starts the app. The demo mode data source remains the
-default unless it is deliberately changed in `.env.local`.
+The launcher starts PostgreSQL on port 5434, creates separate Live and Demo
+databases, applies the same migration lineage to both, validates structural
+parity, and starts the frontend plus Live API (3001) and Demo API (3002).
 
 ## Project map
 
@@ -37,6 +37,10 @@ default unless it is deliberately changed in `.env.local`.
 ```powershell
 npm run db:up
 npm run db:migrate
+npm run db:create:demo
+npm run db:migrate:all
+npm run db:parity
+npm run validate:demo-isolation
 npm run db:seed
 npm run dev
 npm run typecheck
@@ -46,3 +50,6 @@ npm run test
 See [docs/BACKEND_SETUP.md](docs/BACKEND_SETUP.md) for the backend contract and
 local demo accounts, and [docs/README.md](docs/README.md) for the documentation
 index.
+
+The permanent runtime, reset, session, realtime, Story Mode, and database safety
+rules are documented in [docs/LIVE_DEMO_ARCHITECTURE.md](docs/LIVE_DEMO_ARCHITECTURE.md).

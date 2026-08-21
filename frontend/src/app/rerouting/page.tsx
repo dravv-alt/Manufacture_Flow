@@ -1,5 +1,5 @@
 import { ReroutingControl } from "@/components/operations/ReroutingControl";
 
 export default function ReroutingPage() {
-  return <ReroutingControl />;
+  return <div data-tour-id="reroute-result"><ReroutingControl /></div>;
 }

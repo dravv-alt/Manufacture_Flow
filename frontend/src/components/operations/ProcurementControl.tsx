@@ -19,14 +19,19 @@ type RequestState = keyof typeof demoProcurementStates;
 export function ProcurementControl() {
   // REDUNDANT LOCAL STATE — retained for review; requisition state now persists in OperationsContext.
   // const [state, setState] = useState<RequestState>("draft");
-  const { state: operationsState, data, runWorkflowCommand, pendingCommand } = useOperations();
+  const { state: operationsState, activeCase, runWorkflowCommand, pendingCommand } = useOperations();
   const state = operationsState.procurementState;
-  const request = data.procurement;
+  const persistedRequest = activeCase?.procurementRequests[0];
+  const workOrder = activeCase?.maintenanceWorkOrders[0];
+  const vendorNotification = activeCase?.vendorNotifications[0];
+  const request = persistedRequest ? { id: persistedRequest.externalId, partId: activeCase?.part?.code ?? "Unavailable", partName: activeCase?.part?.name ?? "Unavailable", quantity: 1, requiredBy: new Date(persistedRequest.requiredBy).toLocaleString(), linkedCase: activeCase?.failureCase.externalId ?? "Unavailable", workOrderId: workOrder?.externalId ?? "Pending", vendor: persistedRequest.vendor, contact: vendorNotification?.recipientEmail ?? "Queued vendor contact unavailable" } : null;
   const current = demoProcurementStates[state];
-  const projection = request.projections[state];
+  const projection = state === "acknowledged" && request ? [request.requiredBy, request.requiredBy] : state === "delayed" ? ["Vendor delay recorded", "Delivery projection requires recalculation"] : ["Pending response", "Pending response"];
   const stateCopy = demoProcurementStates;
   const setState = (procurementState: keyof typeof demoProcurementStates) => runWorkflowCommand({ type: "set_procurement_state", state: procurementState });
   const send = () => runWorkflowCommand({ type: "set_procurement_state", state: "sent" });
+
+  if (!request) return <main className="grid min-h-[70vh] place-items-center p-8"><section className="max-w-xl rounded-[2rem] border border-dashed border-border bg-card p-8"><Check className="size-8 text-emerald-700" /><h1 className="mt-4 text-2xl font-semibold">No procurement request</h1><p className="mt-2 text-sm text-muted-foreground">{activeCase?.resourceRecoveryResults[0]?.outcome === "reserved" ? "The local spare was reserved, so the recovery graph correctly skipped procurement." : "No persisted procurement request exists for the active recovery. No draft fixture is shown."}</p></section></main>;
 
   return (
     <main className="px-5 py-7 md:px-8 md:py-10">

@@ -9,12 +9,14 @@ import { useOperations } from "@/contexts/OperationsContext";
 import { cn } from "@/lib/utils";
 
 export function ReroutingControl() {
-  const { state, update, runWorkflowCommand, pendingCommand, commandError, clearCommandError } = useOperations();
+  const { state, update, runWorkflowCommand, pendingCommand, commandError, clearCommandError, activeCase } = useOperations();
   const [expandedJob, setExpandedJob] = useState("J1001");
   const selected = state.rerouteTargetId;
   const approved = state.routingApproved;
   const selectTarget = (target: string) => update({ rerouteTargetId: target, routingApproved: false, routingOutcome: "draft" });
   const approveAll = () => runWorkflowCommand({ type: "approve_reroute" });
+
+  if (!activeCase?.rerouteDecisions.length) return <main className="grid min-h-[70vh] place-items-center p-8"><section className="max-w-xl rounded-[2rem] border border-dashed border-border bg-card p-8"><Route className="size-8 text-muted-foreground" /><h1 className="mt-4 text-2xl font-semibold">Reroute decision unavailable</h1><p className="mt-2 text-sm text-muted-foreground">No persisted production reroute decision exists for this recovery. Recommended targets are not fabricated.</p></section></main>;
 
   return <main className="min-h-screen bg-background px-5 py-8 text-[#1c1b1b] lg:px-8"><div className="mx-auto w-full max-w-[1440px] lg:pl-10">
     <header className="mb-10"><div className="flex flex-wrap items-center gap-3"><Badge variant="outline">CONTROLLED DATA</Badge><span className="text-sm text-[#625e61]">Predictive Workstation Failure Detection</span></div><div className="mt-5 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between"><div><div className="flex flex-wrap items-center gap-3"><span className="inline-flex items-center gap-2 rounded-full bg-[#ffdad6] px-4 py-2 text-sm font-semibold text-[#ba1a1a]"><TriangleAlert className="size-4" />WS-102 High Failure Risk</span><span className="text-sm text-[#625e61]">Predicted in 18h</span></div><h1 className="mt-4 text-[32px] font-semibold tracking-[-0.025em]">Production Re-Routing Analysis</h1><p className="mt-2 text-base text-[#625e61]">Which jobs are affected on WS-102, and where should they go instead?</p></div><button onClick={approveAll} disabled={approved || pendingCommand === "approve_reroute"} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-black px-7 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#303030] disabled:cursor-not-allowed disabled:opacity-60"><Route className="size-4" />{approved ? "Routing plan approved" : pendingCommand === "approve_reroute" ? "Approving plan..." : "Approve proposed reroutes"}</button></div>{commandError ? <div role="alert" className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-[#ba1a1a]/30 bg-[#ffdad6]/40 px-4 py-3 text-sm text-[#8e1515]"><span>{commandError}</span><button className="underline" onClick={clearCommandError}>Dismiss</button></div> : null}</header>

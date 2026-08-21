@@ -5,7 +5,7 @@ import { Check, CircleGauge, Clock3, Factory, PackageCheck, ShieldCheck, UserRou
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { demoMaintenanceStages, demoRecoveryScenarios, type RecoveryScenarioId } from "@/demo-data/ws102-scenario";
+import { demoMaintenanceStages, demoRecoveryScenarios, normalizeRecoveryScenario, type RecoveryScenarioId } from "@/demo-data/ws102-scenario";
 import { useOperations } from "@/contexts/OperationsContext";
 import { cn } from "@/lib/utils";
 
@@ -14,9 +14,9 @@ export function MaintenanceControl() {
   // const [scenario, setScenario] = useState<RecoveryScenarioId>("local");
   // const [stageIndex, setStageIndex] = useState(2);
   // const [assignee, setAssignee] = useState("A. Kulkarni / Maintenance Lead");
-  const { state, update, runWorkflowCommand, pendingCommand, commandError, clearCommandError } = useOperations();
-  const scenario = state.recoveryScenario;
-  const stageIndex = state.maintenanceStage;
+  const { state, update, runWorkflowCommand, pendingCommand, commandError, clearCommandError, activeCase, realtimeConnected } = useOperations();
+  const scenario = normalizeRecoveryScenario(state.recoveryScenario);
+  const stageIndex = Math.min(demoMaintenanceStages.length - 1, Math.max(0, Number.isFinite(state.maintenanceStage) ? state.maintenanceStage : 0));
   const assignee = state.maintenanceAssignee;
   const setScenario = (recoveryScenario: RecoveryScenarioId) => update({ recoveryScenario });
   const setStageIndex = (next: number | ((value: number) => number)) => update({ maintenanceStage: typeof next === "function" ? next(stageIndex) : next });
@@ -29,15 +29,17 @@ export function MaintenanceControl() {
     "03:32 IST · Work order planned by " + assignee,
   ], [assignee]);
 
-  const advance = () => runWorkflowCommand({ type: "advance_maintenance", expectedStage: stageIndex + 1 });
+  const workOrder = activeCase?.maintenanceWorkOrders[0];
 
   return (
     <main className="px-5 py-7 md:px-8 md:py-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="flex flex-col gap-5 border-b border-border pb-7">
           <div className="flex flex-wrap items-center gap-3"><Badge variant="outline">CONTROLLED DATA</Badge><span className="font-mono text-xs text-muted-foreground">MAINTENANCE CONTROL / WO-WS102-081</span></div>
-          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Recover WS-102 with visible assumptions.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">The work order links failure evidence, BRG-10023 availability, repair stages, and a deterministic return-to-service estimate.</p></div><Button onClick={advance} disabled={stageIndex === demoMaintenanceStages.length - 1 || pendingCommand === "advance_maintenance"}>{stageIndex === demoMaintenanceStages.length - 1 ? <Check data-icon="inline-start" /> : <Wrench data-icon="inline-start" />}{stageIndex === demoMaintenanceStages.length - 1 ? "Returned to service" : pendingCommand === "advance_maintenance" ? "Updating work order..." : "Advance work order stage"}</Button></div>{commandError ? <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{commandError}</span><button className="underline" onClick={clearCommandError}>Dismiss</button></div> : null}
+          <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"><div className="max-w-3xl"><h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Recover WS-102 with visible assumptions.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">The work order links failure evidence, BRG-10023 availability, repair stages, and a deterministic return-to-service estimate.</p></div><span className={cn("inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold", realtimeConnected ? "border-emerald-600/30 bg-emerald-50 text-emerald-800" : "border-amber-600/30 bg-amber-50 text-amber-900")}><i className={cn("size-2 rounded-full", realtimeConnected ? "bg-emerald-500" : "bg-amber-500")} />{realtimeConnected ? "Realtime connected" : "Realtime reconnecting"}</span></div>{commandError ? <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{commandError}</span><button className="underline" onClick={clearCommandError}>Dismiss</button></div> : null}
         </section>
+
+        <MaintenanceExecutionControls workOrder={workOrder} activeCase={activeCase} pendingCommand={pendingCommand} runWorkflowCommand={runWorkflowCommand} />
 
         <RecoveryCommandCenter stageIndex={stageIndex} scenario={scenario} availability={selected.availability} total={selected.total} onSelectStage={() => undefined} />
 
@@ -70,6 +72,15 @@ export function MaintenanceControl() {
       </div>
     </main>
   );
+}
+
+function MaintenanceExecutionControls({ workOrder, activeCase, pendingCommand, runWorkflowCommand }: { workOrder: NonNullable<ReturnType<typeof useOperations>["activeCase"]>["maintenanceWorkOrders"][number] | undefined; activeCase: ReturnType<typeof useOperations>["activeCase"]; pendingCommand: ReturnType<typeof useOperations>["pendingCommand"]; runWorkflowCommand: ReturnType<typeof useOperations>["runWorkflowCommand"] }) {
+  if (!workOrder) return <section data-tour-id="maintenance-actions" className="rounded-[2rem] border border-dashed border-border bg-card p-6"><h2 className="text-xl font-semibold">Maintenance execution unavailable</h2><p className="mt-2 text-sm text-muted-foreground">Run the recovery workflow first. No fabricated work order is shown.</p></section>;
+  const failed = activeCase?.events.some((event) => event.eventType === "return_to_service_validation_failed") ?? false;
+  const recovered = activeCase?.failureCase.workflowState.toLowerCase().includes("recovered") ?? false;
+  const busy = pendingCommand !== null;
+  const invoke = (command: Parameters<typeof runWorkflowCommand>[0]) => void runWorkflowCommand(command);
+  return <section data-tour-id="maintenance-actions" className="rounded-[2rem] border border-border bg-card p-6 shadow-[0_18px_38px_rgba(0,0,0,0.04)]"><div className="flex flex-col justify-between gap-3 md:flex-row md:items-center"><div><p className="font-mono text-[10px] font-semibold tracking-[0.14em] text-muted-foreground">PERSISTED EXECUTION CONTROLS</p><h2 className="mt-2 text-2xl font-semibold">{workOrder.externalId} · stage {workOrder.stage}</h2><p className="mt-1 text-sm text-muted-foreground">Every control below uses the protected failure-case action route and server-side RBAC.</p></div><Badge variant={recovered ? "secondary" : failed ? "destructive" : "outline"}>{recovered ? "RECOVERED" : failed ? "REQUIRES INTERVENTION" : activeCase?.failureCase.workflowState}</Badge></div><div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5"><Button data-tour-id="maintenance-start" disabled={busy || workOrder.stage > 3} onClick={() => invoke({ type: "start_maintenance", workOrderId: workOrder.id, expectedStage: workOrder.stage, notes: "Controlled Demo maintenance started." })}>Start Maintenance</Button><Button data-tour-id="repair-complete" disabled={busy || ![3, 5, 6].includes(workOrder.stage) || recovered} onClick={() => invoke({ type: "record_repair_completion", workOrderId: workOrder.id, expectedStage: workOrder.stage, notes: failed ? "Corrective rework completed after failed validation." : "Bearing replacement and alignment completed." })}>Record Repair Complete</Button><Button data-tour-id="machine-testing" disabled={busy || workOrder.stage !== 4 || recovered} onClick={() => invoke({ type: "start_machine_testing", workOrderId: workOrder.id, expectedStage: workOrder.stage, notes: "Controlled machine testing started." })}>Start Machine Testing</Button><Button data-tour-id="validation-fail" variant="destructive" disabled={busy || ![5, 6].includes(workOrder.stage) || failed || recovered} onClick={() => invoke({ type: "record_return_to_service_validation", workOrderId: workOrder.id, expectedStage: workOrder.stage, passed: false, notes: "Vibration remained above the return-to-service threshold." })}>Validation FAIL</Button><Button data-tour-id="validation-pass" disabled={busy || ![5, 6].includes(workOrder.stage) || recovered} onClick={() => invoke({ type: "record_return_to_service_validation", workOrderId: workOrder.id, expectedStage: workOrder.stage, passed: true, notes: "Vibration, current, guards, and dry-run checks passed." })}>Validation PASS</Button></div></section>;
 }
 
 function RecoveryCommandCenter({ stageIndex, scenario, availability, total, onSelectStage }: { stageIndex: number; scenario: RecoveryScenarioId; availability: string; total: string; onSelectStage: (stage: number) => void }) {

@@ -48,6 +48,10 @@ export const demoReroutingAlternatives: readonly ReroutingAlternative[] = [
 
 export type RecoveryScenarioId = "local" | "vendor";
 
+export function normalizeRecoveryScenario(value: string | undefined): RecoveryScenarioId {
+  return value === "local" ? "local" : "vendor";
+}
+
 export interface RecoveryScenario {
   readonly label: string;
   readonly availability: string;

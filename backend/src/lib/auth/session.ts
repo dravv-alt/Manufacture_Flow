@@ -3,8 +3,9 @@ import { and, eq, gt, isNull } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db/client";
 import { authSessions, users } from "@/lib/db/schema";
+import { runtimeMode } from "@/lib/runtime/config";
 
-export const SESSION_COOKIE = "machine_overwatch_session";
+export const SESSION_COOKIE = `manufacture_flow_${runtimeMode}_session`;
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 
 export type AuthenticatedUser = {

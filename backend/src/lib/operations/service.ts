@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { failureCases, inventoryItems, inventoryReservations, maintenanceWorkOrders, notificationAttempts, notifications, parts, procurementMessages, procurementRequests, reroutePlans, shipmentImpacts, workstations, workflowEvents } from "@/lib/db/schema";
+import { agentRuns, failureCases, failurePredictions, inventoryItems, inventoryReservations, machineMetricSnapshots, maintenanceWorkOrders, notificationAttempts, notifications, parts, procurementAutomationResults, procurementMessages, procurementRequests, productionJobs, recoveryGraphRuns, recoveryTimeEstimates, rerouteDecisions, reroutePlans, resourceRecoveryResults, shipmentCommitments, shipmentImpacts, telemetryReadings, vendorNotifications, vendors, workstationAllocationLocks, workstations, workflowEvents } from "@/lib/db/schema";
 import { applyMaintenanceExecutionAction, isMaintenanceExecutionAction, MaintenanceExecutionConflictError, MaintenanceExecutionNotFoundError, type MaintenanceExecutionAction } from "@/lib/maintenance-execution/service";
 
 export type WorkflowAction =
@@ -17,6 +17,15 @@ export type WorkflowAction =
 export class OperationNotFoundError extends Error {}
 export class OperationConflictError extends Error {}
 
+function compatibilityMetrics(telemetry: { observedAt: Date; motorCurrent: number; cycleCount: number; anomalySeverity: string } | undefined, capacityPercent: number) {
+  if (!telemetry) return null;
+  const availability = Math.max(70, Math.min(99, capacityPercent > 0 ? 100 - Math.max(0, 70 - capacityPercent) * 0.2 : 70));
+  const performance = Math.max(65, Math.min(99, 100 - Math.max(0, telemetry.motorCurrent - 12) * 1.2));
+  const quality = telemetry.anomalySeverity === "critical" ? 95 : telemetry.anomalySeverity === "warning" ? 98 : 99.5;
+  const cycleTimeSeconds = Math.max(20, Math.round((3600 / Math.max(1, telemetry.cycleCount % 140)) * 10) / 10);
+  return { powerKw: Math.round((Math.sqrt(3) * 400 * telemetry.motorCurrent * 0.82) / 100), availabilityPercent: availability, performancePercent: performance, qualityPercent: quality, oeePercent: Math.round((availability * performance * quality) / 10000 * 10) / 10, cycleTimeSeconds, outputPerHour: Math.max(1, Math.floor(3600 / cycleTimeSeconds)), defectRatePercent: Math.round((100 - quality) * 100) / 100, estimatedRulDays: telemetry.anomalySeverity === "critical" ? 2 : telemetry.anomalySeverity === "warning" ? 30 : 120, operatorId: "SIM", firmwareVersion: "sim-v1.0", networkPingMs: Math.max(8, Math.round(telemetry.motorCurrent)), lastMaintenanceAt: new Date(telemetry.observedAt.getTime() - 42 * 86_400_000), nextMaintenanceAt: new Date(telemetry.observedAt.getTime() + 30 * 86_400_000) };
+}
+
 async function getFailureCase(externalId: string) {
   const [failureCase] = await db.select().from(failureCases).where(eq(failureCases.externalId, externalId)).limit(1);
   if (!failureCase) throw new OperationNotFoundError(`Failure case ${externalId} was not found.`);
@@ -28,30 +37,46 @@ async function recordEvent(input: { failureCaseId: string; entityType: string; e
 }
 
 export async function getOverview() {
-  const [stationRows, caseRows, inventoryRows, rerouteRows, workOrderRows, shipmentRows] = await Promise.all([
+  const [stationRows, telemetryRows, metricRows, caseRows, inventoryRows, rerouteRows, workOrderRows, shipmentRows, jobRows, lockRows, notificationRows, graphRows] = await Promise.all([
     db.select({ code: workstations.code, name: workstations.name, line: workstations.line, status: workstations.status, capacityPercent: workstations.capacityPercent }).from(workstations).orderBy(workstations.code),
+    db.select({ workstationId: telemetryReadings.workstationId, observedAt: telemetryReadings.observedAt, temperature: telemetryReadings.temperatureCelsius, vibration: telemetryReadings.vibrationMmPerSecond, pressure: telemetryReadings.pressureBar, cycleCount: telemetryReadings.cycleCount, motorCurrent: telemetryReadings.motorCurrentAmps, errorCount: sql<number>`jsonb_array_length(${telemetryReadings.activeErrorCodes})`, anomalySeverity: telemetryReadings.anomalySeverity }).from(telemetryReadings).orderBy(desc(telemetryReadings.observedAt)),
+    db.select().from(machineMetricSnapshots).orderBy(desc(machineMetricSnapshots.observedAt)).catch(() => []),
     db.select({ id: failureCases.externalId, stationId: workstations.code, severity: failureCases.severity, component: failureCases.component, probability: failureCases.probability, ttfHours: failureCases.ttfHours, state: failureCases.workflowState }).from(failureCases).innerJoin(workstations, eq(failureCases.workstationId, workstations.id)).orderBy(desc(failureCases.detectedAt)),
     db.select({ partId: parts.code, location: inventoryItems.location, onHand: inventoryItems.onHand, reserved: inventoryItems.reserved, state: inventoryItems.state }).from(inventoryItems).innerJoin(parts, eq(inventoryItems.partId, parts.id)),
     db.select({ state: reroutePlans.state }).from(reroutePlans),
     db.select({ externalId: maintenanceWorkOrders.externalId, stage: maintenanceWorkOrders.stage, assignee: maintenanceWorkOrders.assignee, scenario: maintenanceWorkOrders.scenario }).from(maintenanceWorkOrders),
     db.select({ externalId: shipmentImpacts.externalId, deltaHours: shipmentImpacts.deltaHours, state: shipmentImpacts.state, revisedEta: shipmentImpacts.revisedEta }).from(shipmentImpacts),
+    db.select({ id: productionJobs.id, externalId: productionJobs.externalId, workstationId: productionJobs.workstationId, state: productionJobs.state, operationCode: productionJobs.operationCode, toolingCode: productionJobs.toolingCode, requiredSkill: productionJobs.requiredSkill, estimatedLoadPercent: productionJobs.estimatedLoadPercent }).from(productionJobs),
+    db.select({ failureCaseId: workstationAllocationLocks.failureCaseId, workstationId: workstationAllocationLocks.workstationId, state: workstationAllocationLocks.state, reason: workstationAllocationLocks.reason }).from(workstationAllocationLocks),
+    db.select({ state: notifications.state }).from(notifications),
+    db.select({ correlationId: recoveryGraphRuns.correlationId, status: recoveryGraphRuns.status, state: recoveryGraphRuns.state }).from(recoveryGraphRuns).orderBy(desc(recoveryGraphRuns.startedAt)).limit(1),
   ]);
 
+  const latestTelemetry = new Map<string, typeof telemetryRows[number]>();
+  for (const reading of telemetryRows) if (!latestTelemetry.has(reading.workstationId)) latestTelemetry.set(reading.workstationId, reading);
+  const latestMetrics = new Map<string, typeof metricRows[number]>();
+  for (const metric of metricRows) if (!latestMetrics.has(metric.workstationId)) latestMetrics.set(metric.workstationId, metric);
+  const telemetryByCode = new Map((await db.select({ id: workstations.id, code: workstations.code }).from(workstations)).map((station) => [station.code, { telemetry: latestTelemetry.get(station.id) ?? null, metrics: latestMetrics.get(station.id) ?? null }]));
   return {
     source: "postgres" as const,
     generatedAt: new Date().toISOString(),
-    workstations: stationRows,
+    workstations: stationRows.map((station) => { const feed = telemetryByCode.get(station.code) ?? { telemetry: null, metrics: null }; return { ...station, telemetry: feed.telemetry, metrics: feed.metrics ?? compatibilityMetrics(feed.telemetry, station.capacityPercent) }; }),
     failureCases: caseRows,
     inventory: inventoryRows,
     reroutePlans: rerouteRows,
     maintenance: workOrderRows,
     shipmentImpacts: shipmentRows,
+    productionJobs: jobRows,
+    allocationLocks: lockRows,
+    notificationCounts: notificationRows.reduce((counts, item) => ({ ...counts, [item.state]: (counts[item.state] ?? 0) + 1 }), {} as Record<string, number>),
+    recovery: graphRows[0] ?? null,
+    activeFailureCaseId: caseRows[0]?.id ?? null,
   };
 }
 
 export async function getCaseDetail(externalId: string) {
   const failureCase = await getFailureCase(externalId);
-  const [stationRows, partRows, inventoryRows, reservationRows, rerouteRows, procurementRows, workOrderRows, shipmentRows, notificationRows, eventRows] = await Promise.all([
+  const [stationRows, partRows, inventoryRows, reservationRows, rerouteRows, procurementRows, workOrderRows, shipmentRows, notificationRows, eventRows, predictionRows, lockRows, recoveryRows, procurementResultRows, estimateRows, decisionRows, jobRows, graphRows] = await Promise.all([
     db.select({ code: workstations.code, name: workstations.name, status: workstations.status, capacityPercent: workstations.capacityPercent }).from(workstations).where(eq(workstations.id, failureCase.workstationId)),
     db.select({ code: parts.code, name: parts.name }).from(parts).where(eq(parts.id, failureCase.partId)),
     db.select({ id: inventoryItems.id, location: inventoryItems.location, onHand: inventoryItems.onHand, reserved: inventoryItems.reserved, state: inventoryItems.state }).from(inventoryItems).where(eq(inventoryItems.partId, failureCase.partId)),
@@ -62,11 +87,24 @@ export async function getCaseDetail(externalId: string) {
     db.select().from(shipmentImpacts).where(eq(shipmentImpacts.failureCaseId, failureCase.id)),
     db.select().from(notifications).where(eq(notifications.failureCaseId, failureCase.id)),
     db.select().from(workflowEvents).where(eq(workflowEvents.failureCaseId, failureCase.id)).orderBy(desc(workflowEvents.occurredAt)),
+    db.select().from(failurePredictions).where(eq(failurePredictions.failureCaseId, failureCase.id)).orderBy(desc(failurePredictions.createdAt)),
+    db.select().from(workstationAllocationLocks).where(eq(workstationAllocationLocks.failureCaseId, failureCase.id)),
+    db.select().from(resourceRecoveryResults).where(eq(resourceRecoveryResults.failureCaseId, failureCase.id)),
+    db.select().from(procurementAutomationResults).where(eq(procurementAutomationResults.failureCaseId, failureCase.id)),
+    db.select().from(recoveryTimeEstimates).where(eq(recoveryTimeEstimates.failureCaseId, failureCase.id)).orderBy(desc(recoveryTimeEstimates.createdAt)),
+    db.select().from(rerouteDecisions).where(eq(rerouteDecisions.failureCaseId, failureCase.id)),
+    db.select().from(productionJobs),
+    db.select().from(recoveryGraphRuns).orderBy(desc(recoveryGraphRuns.startedAt)),
   ]);
 
   const messages = procurementRows[0] ? await db.select().from(procurementMessages).where(eq(procurementMessages.procurementRequestId, procurementRows[0].id)).orderBy(procurementMessages.createdAt) : [];
   const attempts = notificationRows.length ? await db.select().from(notificationAttempts).where(inArray(notificationAttempts.notificationId, notificationRows.map((notice) => notice.id))).orderBy(desc(notificationAttempts.occurredAt)) : [];
-  return { failureCase, workstation: stationRows[0] ?? null, part: partRows[0] ?? null, inventory: inventoryRows, reservations: reservationRows, reroutePlans: rerouteRows, procurementRequests: procurementRows, procurementMessages: messages, maintenanceWorkOrders: workOrderRows, shipmentImpacts: shipmentRows, notifications: notificationRows, notificationAttempts: attempts, events: eventRows };
+  const vendorNoticeRows = procurementRows.length ? await db.select({ id: vendorNotifications.id, state: vendorNotifications.state, recipientEmail: vendorNotifications.recipientEmail, vendorName: vendors.name }).from(vendorNotifications).innerJoin(vendors, eq(vendorNotifications.vendorId, vendors.id)).where(inArray(vendorNotifications.procurementRequestId, procurementRows.map((item) => item.id))) : [];
+  const commitmentIds = shipmentRows.map((item) => item.shipmentCommitmentId).filter((id): id is string => Boolean(id));
+  const commitmentRows = commitmentIds.length ? await db.select().from(shipmentCommitments).where(inArray(shipmentCommitments.id, commitmentIds)) : [];
+  const relevantJobIds = new Set([...decisionRows.map((item) => item.productionJobId), ...commitmentRows.flatMap((item) => item.productionJobIds)]);
+  const correlationIds = new Set(lockRows.map((item) => item.correlationId));
+  return { failureCase, workstation: stationRows[0] ?? null, part: partRows[0] ?? null, predictions: predictionRows, allocationLocks: lockRows, inventory: inventoryRows, reservations: reservationRows, resourceRecoveryResults: recoveryRows, reroutePlans: rerouteRows, rerouteDecisions: decisionRows, productionJobs: jobRows.filter((item) => relevantJobIds.has(item.id)), procurementRequests: procurementRows, procurementAutomationResults: procurementResultRows, procurementMessages: messages, vendorNotifications: vendorNoticeRows, maintenanceWorkOrders: workOrderRows, recoveryTimeEstimates: estimateRows, shipmentImpacts: shipmentRows, shipmentCommitments: commitmentRows, notifications: notificationRows, notificationAttempts: attempts, recoveryGraphRuns: graphRows.filter((item) => correlationIds.has(item.correlationId)), events: eventRows };
 }
 
 export async function applyWorkflowAction(externalId: string, action: WorkflowAction) {
