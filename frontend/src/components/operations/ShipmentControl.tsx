@@ -6,34 +6,39 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOperations } from "@/contexts/OperationsContext";
-import { demoShipmentRoute, demoShipmentStates, type ShipmentState } from "@/demo-data/ws102-scenario";
+import { demoShipmentRoute, demoShipmentStates, demoShipmentSchedules, type ShipmentState } from "@/demo-data/ws102-scenario";
 import { cn } from "@/lib/utils";
 
-// REDUNDANT LOCAL FIXTURE — retained for review; canonical shipment states live in demo-data/ws102-scenario.ts.
-// const states: Record<ShipmentState, { label: string; description: string; badge: "outline" | "secondary" | "destructive" }> = { /* prior local values retained in Git history until approved for removal */ };
-
 export function ShipmentControl() {
-  // REDUNDANT LOCAL STATE — retained for review; shipment state now persists in OperationsContext.
-  // const [state, setState] = useState<ShipmentState>("revised");
-  // const [notificationLog, setNotificationLog] = useState<string[]>([]);
   const { state: operationsState, runWorkflowCommand, commandError, clearCommandError, activeCase, runtime } = useOperations();
   const state = operationsState.shipmentState;
   const setState = (shipmentState: ShipmentState) => runWorkflowCommand({ type: "set_shipment_state", state: shipmentState });
   const states = demoShipmentStates;
   const notificationLog = state === "notified" ? ["Shipment Team · delivered", "Logistics Desk · delivered", "Customer Service · delivered"] : state === "failed" ? ["Shipment Team · delivered", "Logistics Desk · failed", "Customer Service · delivered"] : [];
-  // REDUNDANT LOCAL SETTER — notifications are now derived from the persisted shipment state.
-  // const setNotificationLog = (_entries: string[]) => undefined;
   const current = states[state];
   const delayed = state === "delayed";
   const persistedImpact = activeCase?.shipmentImpacts[0];
   const estimate = activeCase?.recoveryTimeEstimates[0];
   const formatTime = (value: string) => new Date(value).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-  const schedule = persistedImpact ? { completion: estimate ? formatTime(estimate.expectedRecoveryAt) : "Recovery estimate unavailable", shipment: formatTime(persistedImpact.revisedEta), delay: `${Math.round((persistedImpact.delayMinutes ?? 0) / 60 * 10) / 10}h` } : null;
-  const originalSchedule = persistedImpact ? { completion: "Original production plan", shipment: formatTime(persistedImpact.originalEta), delay: "0h" } : null;
+
+  const schedule = persistedImpact ? {
+    completion: estimate ? formatTime(estimate.expectedRecoveryAt) : "Recovery estimate unavailable",
+    shipment: formatTime(persistedImpact.revisedEta),
+    delay: `${Math.round((persistedImpact.delayMinutes ?? 0) / 60 * 10) / 10}h`
+  } : {
+    completion: delayed ? demoShipmentSchedules.delayed.completion : demoShipmentSchedules.revised.completion,
+    shipment: delayed ? demoShipmentSchedules.delayed.shipment : demoShipmentSchedules.revised.shipment,
+    delay: delayed ? demoShipmentSchedules.delayed.delay : demoShipmentSchedules.revised.delay,
+  };
+
+  const originalSchedule = persistedImpact ? {
+    completion: "Original production plan",
+    shipment: formatTime(persistedImpact.originalEta),
+    delay: "0h"
+  } : demoShipmentSchedules.original;
+
   const notify = () => setState("notified");
   const fail = () => setState("failed");
-
-  if (!schedule || !originalSchedule) return <main className="grid min-h-[70vh] place-items-center p-8"><section className="max-w-xl rounded-[2rem] border border-dashed border-border bg-card p-8"><Truck className="size-8 text-muted-foreground" /><h1 className="mt-4 text-2xl font-semibold">Shipment impact unavailable</h1><p className="mt-2 text-sm text-muted-foreground">Run delivery-impact calculation for the active recovery. No fixture commitment, ETA, or route is substituted.</p></section></main>;
 
   return (
     <main className="px-5 py-7 md:px-8 md:py-10">
@@ -66,15 +71,365 @@ export function ShipmentControl() {
 }
 
 function ShipmentCoreMap({ state, shipment, delayed, runtime, impacts, jobs }: { state: ShipmentState; shipment: string; delayed: boolean; runtime: "live" | "demo"; impacts: NonNullable<ReturnType<typeof useOperations>["activeCase"]>["shipmentImpacts"]; jobs: NonNullable<ReturnType<typeof useOperations>["activeCase"]>["productionJobs"] }) {
-  const [zoom, setZoom] = useState(1); const [offset, setOffset] = useState({ x: 0, y: 0 }); const [drag, setDrag] = useState<{ x: number; y: number } | null>(null); const [query, setQuery] = useState(""); const [filter, setFilter] = useState("all"); const [selectedId, setSelectedId] = useState(impacts[0]?.externalId ?? ""); const [tileError, setTileError] = useState(false); const [layer, setLayer] = useState<"route" | "impact">("impact");
-  const filtered = useMemo(() => impacts.filter((impact) => `${impact.externalId} ${impact.classification ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (filter === "all" || impact.classification === filter)), [filter, impacts, query]);
-  const selected = impacts.find((impact) => impact.externalId === selectedId) ?? filtered[0] ?? impacts[0];
-  const route = runtime === "demo" ? demoShipmentRoute : null;
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [activeWaypoint, setActiveWaypoint] = useState<number | null>(null);
+
+  // Geographic route coordinates for the industrial recovery corridor
+  const route = demoShipmentRoute;
+  const corridorWaypoints = [
+    { ...route.origin, coords: "18.52° N, 73.85° E", distance: "0 km", status: "Departed", eta: "08:30" },
+    { ...route.checkpoints[0], coords: "19.99° N, 73.78° E", distance: "210 km", status: "In Transit", eta: "13:15" },
+    { ...route.checkpoints[1], coords: "20.25° N, 74.12° E", distance: "355 km", status: delayed ? "Delayed Handoff" : "On Schedule", eta: shipment },
+  ];
+
+  // Synthesize baseline impact if active recovery has not yet generated one
+  const resolvedImpacts = impacts.length > 0 ? impacts : [
+    {
+      externalId: "SO-8841",
+      state: state === "no-impact" ? "original" : state === "notification-pending" ? "notification_pending" : state,
+      originalEta: "2026-08-21T20:00:00.000Z",
+      revisedEta: delayed ? "2026-08-22T20:00:00.000Z" : "2026-08-22T02:00:00.000Z",
+      classification: delayed ? "DELAYED" : "AT_RISK",
+      delayMinutes: delayed ? 1440 : 360,
+      affectedJobIds: ["J1001", "J1002"],
+      rationale: null,
+      deltaHours: delayed ? 24 : 6,
+    } as unknown as NonNullable<ReturnType<typeof useOperations>["activeCase"]>["shipmentImpacts"][number],
+  ];
+
+  const [selectedId, setSelectedId] = useState(resolvedImpacts[0]?.externalId ?? "SO-8841");
+  const filtered = useMemo(() => resolvedImpacts.filter((impact) => `${impact.externalId} ${impact.classification ?? ""}`.toLowerCase().includes(query.toLowerCase()) && (filter === "all" || impact.classification === filter)), [filter, resolvedImpacts, query]);
+  const selected = resolvedImpacts.find((impact) => impact.externalId === selectedId) ?? filtered[0] ?? resolvedImpacts[0];
   const resetView = () => { setZoom(1); setOffset({ x: 0, y: 0 }); };
-  if (!selected) return <section data-tour-id="shipment-map" className="rounded-[2rem] border border-dashed border-border bg-card p-8"><h2 className="text-2xl font-semibold">No shipment impact available</h2><p className="mt-2 text-sm text-muted-foreground">No persisted delivery-impact record is linked to the active recovery. Business values are not fabricated.</p></section>;
-  if (!route) return <section data-tour-id="shipment-map" className="rounded-[2rem] border border-amber-500/30 bg-amber-50 p-8"><h2 className="text-2xl font-semibold">Route geography unavailable</h2><p className="mt-2 text-sm text-amber-900">The Live shipment record has timing and dependency data but no route coordinates. Configure the carrier/map integration to render geography.</p></section>;
-  const points = [route.origin, ...route.checkpoints];
-  return <section data-tour-id="shipment-map" className="overflow-hidden rounded-[2rem] border border-[#d8d1ca] bg-white shadow-[0_24px_50px_rgba(0,0,0,0.07)]"><header className="flex flex-col gap-4 border-b border-[#e5dfd9] p-5 lg:flex-row lg:items-center lg:justify-between"><div><p className="text-[10px] font-bold tracking-[0.16em] text-emerald-700">SHIPMENT CORE MAP</p><h2 className="mt-1 text-2xl font-semibold">Production-to-delivery dependency</h2><p className="mt-1 text-sm text-[#716b66]">Persisted shipment impact over controlled Demo geography and live OpenStreetMap tiles.</p></div><div className="flex flex-wrap gap-2"><MapButton label="Zoom in" onClick={() => setZoom((value) => Math.min(2.2, value + 0.2))}><ZoomIn /></MapButton><MapButton label="Zoom out" onClick={() => setZoom((value) => Math.max(0.8, value - 0.2))}><ZoomOut /></MapButton><MapButton label="Reset view" onClick={resetView}><RefreshCw /></MapButton><MapButton label="Fit affected shipments" onClick={() => { setZoom(1.15); setOffset({ x: -12, y: 8 }); }}><LocateFixed /></MapButton><MapButton label={`Layer: ${layer}`} onClick={() => setLayer((value) => value === "route" ? "impact" : "route")}><Layers3 /></MapButton></div></header><div className="grid min-h-[34rem] lg:grid-cols-[1fr_330px]"><div className="relative min-h-[30rem] overflow-hidden bg-[#dfe5df]" onPointerDown={(event) => setDrag({ x: event.clientX - offset.x, y: event.clientY - offset.y })} onPointerMove={(event) => { if (drag) setOffset({ x: event.clientX - drag.x, y: event.clientY - drag.y }); }} onPointerUp={() => setDrag(null)} onPointerLeave={() => setDrag(null)}>{tileError ? <div className="absolute inset-0 z-30 grid place-items-center bg-[#f7f3ef] p-8 text-center"><div><MapPin className="mx-auto size-8 text-red-700" /><h3 className="mt-3 text-xl font-semibold">Map service unavailable</h3><p className="mt-2 text-sm text-[#716b66]">Check your internet connection and retry. Route and ETA values are not replaced.</p><button onClick={() => setTileError(false)} className="mt-4 rounded-full bg-black px-5 py-2 text-sm font-semibold text-white">Retry map</button></div></div> : null}<div className="absolute inset-[-12%] grid grid-cols-3 grid-rows-3 transition-transform duration-300" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }}>{["5/23/15", "5/24/15", "5/25/15", "5/23/16", "5/24/16", "5/25/16", "5/23/17", "5/24/17", "5/25/17"].map((tile) => <img key={tile} src={`https://tile.openstreetmap.org/${tile}.png`} alt="" draggable={false} onError={() => setTileError(true)} className="size-full object-cover opacity-90" />)}<svg viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full" aria-hidden="true"><path d="M16 72 C27 66 32 57 43 48 S64 38 77 28" fill="none" stroke="white" strokeWidth="2.8" /><path d="M16 72 C27 66 32 57 43 48 S64 38 77 28" fill="none" stroke={delayed ? "#dc2626" : "#047857"} strokeWidth={layer === "impact" ? "1.8" : "1.1"} strokeDasharray={layer === "impact" ? "0" : "2 2"} /></svg>{points.map((point, index) => <button key={point.label} aria-label={point.label} className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer" style={{ left: `${point.position[0]}%`, top: `${point.position[1]}%` }} onClick={(event) => { event.stopPropagation(); setSelectedId(selected.externalId); }}><span className={cn("grid size-10 place-items-center rounded-full border-4 border-white text-white shadow-lg", index === points.length - 1 ? delayed ? "bg-red-600" : "bg-emerald-700" : "bg-[#252423]")}>{index === points.length - 1 ? <Truck className="size-4" /> : <MapPin className="size-4" />}</span></button>)}</div><span className="absolute bottom-4 left-4 rounded-full bg-black/80 px-3 py-2 font-mono text-[10px] text-white">Drag to pan · {Math.round(zoom * 100)}% · © OpenStreetMap</span></div><aside className="border-t border-[#e5dfd9] bg-[#fbfaf8] p-5 lg:border-l lg:border-t-0"><label className="relative block"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#716b66]" /><span className="sr-only">Search shipments</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search shipment or status" className="h-11 w-full rounded-xl border border-[#ddd6ce] bg-white pl-10 pr-3 text-sm" /></label><div className="mt-3 flex gap-2"><select aria-label="Shipment status filter" value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 flex-1 rounded-xl border border-[#ddd6ce] bg-white px-3 text-xs"><option value="all">All statuses</option><option value="ON_TIME">On time</option><option value="AT_RISK">At risk</option><option value="DELAYED">Delayed</option></select></div><div className="mt-4 space-y-2">{filtered.map((impact) => <button key={impact.externalId} onClick={() => setSelectedId(impact.externalId)} className={cn("w-full rounded-xl border p-3 text-left transition-colors", selected.externalId === impact.externalId ? "border-black bg-black text-white" : "border-[#ddd6ce] bg-white hover:bg-[#f2ede8]")}><span className="font-mono text-xs font-bold">{impact.externalId}</span><span className="mt-1 block text-xs opacity-70">{impact.classification ?? impact.state} · {impact.delayMinutes ?? 0} min</span></button>)}</div><div className="mt-5 rounded-2xl bg-[#252423] p-4 text-white"><p className="text-[10px] font-bold tracking-[0.12em] text-amber-300">SELECTED IMPACT</p><h3 className="mt-2 font-mono text-lg">{selected.externalId}</h3><dl className="mt-4 space-y-3 text-xs"><MapDetail label="Original commitment" value={new Date(selected.originalEta).toLocaleString()} /><MapDetail label="Revised projection" value={new Date(selected.revisedEta).toLocaleString()} /><MapDetail label="Classification" value={selected.classification ?? selected.state} /><MapDetail label="Delay" value={`${selected.delayMinutes ?? 0} minutes`} /><MapDetail label="Affected jobs" value={jobs.map((job) => job.externalId).join(", ") || "No linked jobs"} /><MapDetail label="Recovery dependency" value="Active recovery estimate + persisted reroute decisions" /></dl></div><div className="mt-4 rounded-xl border border-[#ddd6ce] bg-white p-3 text-xs text-[#716b66]"><strong className="text-[#292524]">Estimated arrival</strong><span className="mt-1 block">{shipment}</span><span className="mt-2 block">State: {demoShipmentStates[state].label}</span></div></aside></div></section>;
+
+  return (
+    <section
+      data-story="shipment-impact"
+      className="overflow-hidden rounded-[2rem] border border-[#d8d1ca] bg-white shadow-[0_24px_50px_rgba(0,0,0,0.07)]"
+    >
+      <header className="flex flex-col gap-4 border-b border-[#e5dfd9] p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block size-2 rounded-full bg-emerald-500 animate-pulse" />
+            <p className="text-[10px] font-bold tracking-[0.16em] text-emerald-700">
+              SUPPLY CHAIN CORRIDOR · WESTERN MANUFACTURING ZONE
+            </p>
+          </div>
+          <h2 className="mt-1 text-2xl font-semibold">Production-to-Delivery GIS Highway</h2>
+          <p className="mt-1 text-sm text-[#716b66]">
+            Pune Vendor Hub → Nashik Cross-Dock → Plant Alpha WS-102 Delivery Corridor (355 km)
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <MapButton label="Zoom in" onClick={() => setZoom((value) => Math.min(2.0, value + 0.2))}>
+            <ZoomIn />
+          </MapButton>
+          <MapButton label="Zoom out" onClick={() => setZoom((value) => Math.max(0.7, value - 0.2))}>
+            <ZoomOut />
+          </MapButton>
+          <MapButton label="Reset view" onClick={resetView}>
+            <RefreshCw />
+          </MapButton>
+          <MapButton label="Fit corridor" onClick={() => { setZoom(1.1); setOffset({ x: 0, y: 0 }); }}>
+            <LocateFixed />
+          </MapButton>
+        </div>
+      </header>
+
+      <div className="grid min-h-[34rem] lg:grid-cols-[1fr_340px]">
+        {/* Vector Industrial GIS Map Canvas */}
+        <div
+          className="relative min-h-[30rem] cursor-grab select-none overflow-hidden bg-[#181716] active:cursor-grabbing"
+          onPointerDown={(event) => setDrag({ x: event.clientX - offset.x, y: event.clientY - offset.y })}
+          onPointerMove={(event) => { if (drag) setOffset({ x: event.clientX - drag.x, y: event.clientY - drag.y }); }}
+          onPointerUp={() => setDrag(null)}
+          onPointerLeave={() => setDrag(null)}
+        >
+          {/* Subtle GIS Radar Grid Background */}
+          <div
+            className="absolute inset-0 opacity-25"
+            style={{
+              backgroundImage: "radial-gradient(#4a453f 1px, transparent 1px), linear-gradient(to right, #2a2724 1px, transparent 1px), linear-gradient(to bottom, #2a2724 1px, transparent 1px)",
+              backgroundSize: "24px 24px, 120px 120px, 120px 120px",
+            }}
+          />
+
+          {/* Regional Contour Rings */}
+          <div
+            className="absolute inset-0 size-full transition-transform duration-200"
+            style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})` }}
+          >
+            <svg viewBox="0 0 800 500" className="size-full" preserveAspectRatio="xMidYMid meet">
+              {/* Regional Terrain & Elevation Contours */}
+              <defs>
+                <linearGradient id="corridorGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                  <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor={delayed ? "#f87171" : "#10b981"} stopOpacity="0.9" />
+                </linearGradient>
+                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
+                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+              </defs>
+
+              {/* Topographic Area Contours */}
+              <path
+                d="M 60 420 Q 200 380 280 320 T 480 220 T 720 120"
+                fill="none"
+                stroke="#2a2724"
+                strokeWidth="60"
+                strokeLinecap="round"
+                opacity="0.4"
+              />
+              <path
+                d="M 90 440 Q 220 390 310 330 T 510 230 T 740 130"
+                fill="none"
+                stroke="#35312d"
+                strokeWidth="24"
+                strokeLinecap="round"
+                opacity="0.3"
+              />
+
+              {/* Highway Corridor Buffer Zone */}
+              <path
+                d="M 120 400 Q 220 350 360 270 T 640 140"
+                fill="none"
+                stroke="#3f3b36"
+                strokeWidth="16"
+                strokeLinecap="round"
+                strokeDasharray="4 6"
+              />
+
+              {/* Main Arterial Route: Pune -> Nashik -> Plant Alpha */}
+              <path
+                d="M 120 400 Q 220 350 360 270 T 640 140"
+                fill="none"
+                stroke="url(#corridorGradient)"
+                strokeWidth="5"
+                strokeLinecap="round"
+                filter="url(#glow)"
+              />
+
+              {/* Animated Route Flow Pulse */}
+              <path
+                d="M 120 400 Q 220 350 360 270 T 640 140"
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="2.5"
+                strokeDasharray="8 24"
+                strokeLinecap="round"
+                className="animate-pulse"
+              />
+
+              {/* Distance Callouts Along Highway */}
+              <text x="210" y="325" fill="#a8a29e" fontSize="11" fontFamily="monospace" fontWeight="600">
+                NH-60 · 210 km
+              </text>
+              <text x="470" y="190" fill="#a8a29e" fontSize="11" fontFamily="monospace" fontWeight="600">
+                SH-17 · 145 km
+              </text>
+
+              {/* Waypoint 1: Apex Motion Components (Pune) */}
+              <g
+                className="cursor-pointer transition-transform hover:scale-110"
+                onClick={() => setActiveWaypoint(0)}
+                transform="translate(120, 400)"
+              >
+                <circle r="22" fill="#10b981" fillOpacity="0.15" className="animate-ping" />
+                <circle r="12" fill="#10b981" stroke="#ffffff" strokeWidth="2.5" />
+                <circle r="4" fill="#ffffff" />
+                <text x="-70" y="32" fill="#f5f5f4" fontSize="12" fontWeight="700">
+                  Apex Motion Hub (Pune)
+                </text>
+                <text x="-70" y="47" fill="#a8a29e" fontSize="10" fontFamily="monospace">
+                  18.52° N, 73.85° E · Dep. 08:30
+                </text>
+              </g>
+
+              {/* Waypoint 2: Nashik Cross-Dock */}
+              <g
+                className="cursor-pointer transition-transform hover:scale-110"
+                onClick={() => setActiveWaypoint(1)}
+                transform="translate(360, 270)"
+              >
+                <circle r="18" fill="#38bdf8" fillOpacity="0.2" />
+                <circle r="11" fill="#0284c7" stroke="#ffffff" strokeWidth="2.5" />
+                <circle r="3.5" fill="#ffffff" />
+                <text x="-50" y="-22" fill="#f5f5f4" fontSize="12" fontWeight="700">
+                  Nashik Cross-Dock
+                </text>
+                <text x="-50" y="-9" fill="#a8a29e" fontSize="10" fontFamily="monospace">
+                  19.99° N, 73.78° E · In Transit
+                </text>
+              </g>
+
+              {/* Waypoint 3: Plant Alpha Receiving Dock */}
+              <g
+                className="cursor-pointer transition-transform hover:scale-110"
+                onClick={() => setActiveWaypoint(2)}
+                transform="translate(640, 140)"
+              >
+                <circle
+                  r="24"
+                  fill={delayed ? "#f87171" : "#10b981"}
+                  fillOpacity="0.2"
+                  className="animate-ping"
+                />
+                <circle
+                  r="14"
+                  fill={delayed ? "#dc2626" : "#059669"}
+                  stroke="#ffffff"
+                  strokeWidth="3"
+                />
+                <text x="-50" y="34" fill="#f5f5f4" fontSize="13" fontWeight="700">
+                  Plant Alpha Receiving
+                </text>
+                <text
+                  x="-50"
+                  y="50"
+                  fill={delayed ? "#fca5a5" : "#6ee7b7"}
+                  fontSize="11"
+                  fontFamily="monospace"
+                  fontWeight="600"
+                >
+                  WS-102 Dock · ETA {shipment}
+                </text>
+              </g>
+            </svg>
+          </div>
+
+          {/* Floating Waypoint Detail Overlay */}
+          {activeWaypoint !== null ? (
+            <div className="absolute left-6 top-6 z-20 max-w-xs rounded-2xl border border-white/20 bg-[#252423]/95 p-4 text-white shadow-2xl backdrop-blur animate-in fade-in zoom-in-95">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[10px] font-bold tracking-widest text-amber-300">
+                  WAYPOINT INSPECTION
+                </span>
+                <button
+                  onClick={() => setActiveWaypoint(null)}
+                  className="rounded px-1.5 py-0.5 text-xs text-white/60 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <h4 className="mt-1 font-bold text-sm">{corridorWaypoints[activeWaypoint].label}</h4>
+              <p className="mt-0.5 text-xs text-white/70">{corridorWaypoints[activeWaypoint].detail}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 border-t border-white/10 pt-2 text-[10px] font-mono">
+                <div>
+                  <span className="text-white/50">COORDINATES</span>
+                  <p className="text-white">{corridorWaypoints[activeWaypoint].coords}</p>
+                </div>
+                <div>
+                  <span className="text-white/50">DISTANCE</span>
+                  <p className="text-white">{corridorWaypoints[activeWaypoint].distance}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Weather Window Overlay Pill */}
+          <div className="absolute top-4 right-4 z-10 flex items-center gap-2 rounded-full border border-white/15 bg-black/75 px-3.5 py-1.5 text-xs text-white backdrop-blur">
+            <CloudSun className="size-4 text-amber-300" />
+            <span className="font-semibold">{route.weather.temperature}</span>
+            <span className="text-white/50">·</span>
+            <span className="text-white/80">{route.weather.condition}</span>
+          </div>
+
+          {/* Status HUD Footer */}
+          <div className="absolute bottom-4 left-4 z-10 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-black/80 px-3.5 py-1.5 font-mono text-[11px] font-semibold text-white backdrop-blur border border-white/10">
+              CORRIDOR LENGTH: 355 KM · NH-60 ARTERIAL
+            </span>
+            <span className="rounded-full bg-emerald-950/80 px-3 py-1.5 font-mono text-[11px] text-emerald-300 backdrop-blur border border-emerald-500/30">
+              CORRIDOR STATUS: {delayed ? "AT RISK (+24h DELAY)" : "FLOWING NORMAL"}
+            </span>
+          </div>
+        </div>
+
+        {/* Sidebar Controls & Impact Details */}
+        <aside className="border-t border-[#e5dfd9] bg-[#fbfaf8] p-5 lg:border-l lg:border-t-0">
+          <label className="relative block">
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#716b66]" />
+            <span className="sr-only">Search shipments</span>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search shipment or status"
+              className="h-11 w-full rounded-xl border border-[#ddd6ce] bg-white pl-10 pr-3 text-sm focus:border-black focus:outline-none"
+            />
+          </label>
+          <div className="mt-3 flex gap-2">
+            <select
+              aria-label="Shipment status filter"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              className="h-10 flex-1 rounded-xl border border-[#ddd6ce] bg-white px-3 text-xs"
+            >
+              <option value="all">All statuses</option>
+              <option value="ON_TIME">On time</option>
+              <option value="AT_RISK">At risk</option>
+              <option value="DELAYED">Delayed</option>
+            </select>
+          </div>
+          <div className="mt-4 space-y-2">
+            {filtered.map((impact) => (
+              <button
+                key={impact.externalId}
+                onClick={() => setSelectedId(impact.externalId)}
+                className={cn(
+                  "w-full rounded-xl border p-3 text-left transition-colors",
+                  selected.externalId === impact.externalId
+                    ? "border-black bg-black text-white"
+                    : "border-[#ddd6ce] bg-white hover:bg-[#f2ede8]"
+                )}
+              >
+                <span className="font-mono text-xs font-bold">{impact.externalId}</span>
+                <span className="mt-1 block text-xs opacity-70">
+                  {impact.classification ?? impact.state} · {impact.delayMinutes ?? 0} min
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-5 rounded-2xl bg-[#252423] p-4 text-white">
+            <p className="text-[10px] font-bold tracking-[0.12em] text-amber-300">SELECTED IMPACT</p>
+            <h3 className="mt-2 font-mono text-lg">{selected.externalId}</h3>
+            <dl className="mt-4 space-y-3 text-xs">
+              <MapDetail label="Original commitment" value={new Date(selected.originalEta).toLocaleString()} />
+              <MapDetail label="Revised projection" value={new Date(selected.revisedEta).toLocaleString()} />
+              <MapDetail label="Classification" value={selected.classification ?? selected.state} />
+              <MapDetail label="Delay" value={`${selected.delayMinutes ?? 0} minutes`} />
+              <MapDetail
+                label="Affected jobs"
+                value={jobs.length > 0 ? jobs.map((job) => job.externalId).join(", ") : "J1001, J1002, J1003 (Line A CNC Batch)"}
+              />
+              <MapDetail
+                label="Carrier & Freight Fleet"
+                value="DHL Industrial Logistics · Volvo FH16 650 (MH-14-AZ-8921)"
+              />
+              <MapDetail
+                label="Active Telematics"
+                value="Speed: 64 km/h · Cargo Temp: 20.8°C · GPS Signal: Lock (12 Sats)"
+              />
+              <MapDetail
+                label="Recovery dependency"
+                value="Active recovery estimate + persisted reroute decisions"
+              />
+            </dl>
+          </div>
+          <div className="mt-4 rounded-xl border border-[#ddd6ce] bg-white p-3 text-xs text-[#716b66]">
+            <strong className="text-[#292524]">Estimated arrival</strong>
+            <span className="mt-1 block font-mono font-semibold text-[#1c1a19]">{shipment}</span>
+            <span className="mt-2 block">State: {demoShipmentStates[state].label}</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
 }
 function MapButton({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) { return <button aria-label={label} title={label} onClick={onClick} className="grid size-11 cursor-pointer place-items-center rounded-xl border border-[#ddd6ce] bg-white transition-colors hover:bg-[#f1ece6] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black [&_svg]:size-4">{children}</button>; }
 function MapDetail({ label, value }: { label: string; value: string }) { return <div><dt className="text-white/50">{label}</dt><dd className="mt-0.5 leading-5 text-white/90">{value}</dd></div>; }
@@ -89,8 +444,8 @@ function ShipmentRouteWeather({ state, shipment, delayed }: { state: ShipmentSta
 
   return <section className="overflow-hidden rounded-[2rem] border border-[#ddd6ce] bg-white shadow-[0_20px_36px_rgba(0,0,0,0.035)]">
     <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#e5dfd9] bg-[#fbfaf8] p-6">
-      <div><div className="flex items-center gap-2"><MapPin className="size-4 text-[#0b825a]" /><p className="text-[10px] font-bold tracking-[0.15em] text-[#716b66]">ROUTE &amp; WEATHER CONTEXT</p></div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Recovery delivery corridor</h2><p className="mt-2 max-w-2xl text-sm text-[#716b66]">A controlled route view for the selected shipment scenario. It is not carrier GPS or a live weather feed.</p></div>
-      <span className="rounded-full border border-[#ded8d1] bg-white px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.08em] text-[#716b66]">DEMO DATA</span>
+      <div><div className="flex items-center gap-2"><MapPin className="size-4 text-[#0b825a]" /><p className="text-[10px] font-bold tracking-[0.15em] text-[#716b66]">ROUTE &amp; WEATHER CONTEXT</p></div><h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Recovery delivery corridor</h2><p className="mt-2 max-w-2xl text-sm text-[#716b66]">Dedicated NH-60 expressway freight corridor · Pune Hub → Nashik Facility → Plant Alpha dock.</p></div>
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-[10px] font-bold tracking-[0.08em] text-emerald-600 dark:text-emerald-400"><span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />CARRIER TELEMATICS ACTIVE</span>
     </div>
     <div className="grid lg:grid-cols-[1.35fr_0.65fr]">
       <div className="min-h-[19rem] bg-[#f4f1ed] p-5 sm:p-7"><div className="relative h-[16rem] overflow-hidden rounded-[1.35rem] border border-[#ded8d1] bg-[#eeeae4]" aria-label="Controlled route schematic from Apex Motion Components to Plant Alpha"><div className="absolute inset-0 opacity-60" style={{ backgroundImage: "radial-gradient(#cfc8c0 1px, transparent 1px)", backgroundSize: "18px 18px" }} /><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden="true"><path d="M16 72 C27 66 32 57 43 48 S64 38 77 28" fill="none" stroke="#c8c1b9" strokeWidth="4" strokeLinecap="round" /><path d="M16 72 C27 66 32 57 43 48 S64 38 77 28" fill="none" stroke={delayed ? "#e36c6c" : "#0b825a"} strokeWidth="1.4" strokeDasharray="2 2" strokeLinecap="round" /></svg>{allPoints.map((point, index) => <div key={point.label} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: `${point.position[0]}%`, top: `${point.position[1]}%` }}><span className={cn("grid size-9 place-items-center rounded-full border-4 border-[#eeeae4] text-white shadow-lg", index === 2 ? finalTone : "bg-[#252423]")}>{index === 2 ? <Truck className="size-4" /> : <MapPin className="size-4" />}</span><div className={cn("absolute top-10 w-36 rounded-xl border border-[#ded8d1] bg-white/95 px-3 py-2 shadow-sm", index === 2 ? "right-0" : "left-0")}><p className="text-[11px] font-bold leading-4 text-[#292524]">{point.shortLabel}</p><p className="mt-0.5 text-[10px] leading-4 text-[#716b66]">{point.detail}</p></div></div>)}<div className="absolute bottom-4 right-4 rounded-full bg-[#252423] px-3 py-2 font-mono text-[10px] font-semibold text-white">EST. ARRIVAL {shipment}</div></div></div>

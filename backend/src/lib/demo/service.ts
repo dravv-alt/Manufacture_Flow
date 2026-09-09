@@ -104,8 +104,12 @@ export function resetDemoScenario(scenario: DemoScenarioId = "golden") {
 
 async function triggerDemoTelemetryUnlocked(scenario: DemoScenarioId) {
   await simulateTelemetryTick();
-  const [station] = await db.select().from(workstations).where(eq(workstations.code, "WS-102")).limit(1);
-  if (!station) throw new Error("Reset and seed a Demo scenario before triggering telemetry.");
+  let [station] = await db.select().from(workstations).where(eq(workstations.code, "WS-102")).limit(1);
+  if (!station) {
+    await resetDemoScenarioUnlocked(assertDemoDatabaseSafety(), scenario);
+    [station] = await db.select().from(workstations).where(eq(workstations.code, "WS-102")).limit(1);
+    if (!station) throw new Error("Reset and seed a Demo scenario before triggering telemetry.");
+  }
   const suffix = `${scenario}-${Date.now()}`;
   const samples = [
     { sourceEventId: `demo-healthy-${suffix}`, temperatureCelsius: 62, vibrationMmPerSecond: 1.5, motorCurrentAmps: 13, activeErrorCodes: [] as string[] },

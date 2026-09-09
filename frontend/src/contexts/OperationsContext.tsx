@@ -41,18 +41,136 @@ function statusForUi(status: string): Workstation["status"] { if (/recover/i.tes
 
 export function OperationsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialOperationsState); const [runtime, setRuntime] = useState<FrontendRuntimeMode>("live"); const [demoScenario, setDemoScenario] = useState<DemoScenarioId>("golden"); const [storyMode, setStoryMode] = useState<StoryMode>("manual");
-  const [overview, setOverview] = useState<Overview | null>(null); const [activeCase, setActiveCase] = useState<BackendCaseSnapshot | null>(null); const [pendingCommand, setPendingCommand] = useState<WorkflowCommand["type"] | null>(null); const [commandError, setCommandError] = useState<string | null>(null); const [backendError, setBackendError] = useState<string | null>(null); const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null); const [runtimeBusy, setRuntimeBusy] = useState(false); const [realtimeConnected, setRealtimeConnected] = useState(false); const refreshVersion = useRef(0);
+  const [overview, setOverview] = useState<Overview | null>(null); const [activeCase, setActiveCase] = useState<BackendCaseSnapshot | null>(null); const [pendingCommand, setPendingCommand] = useState<WorkflowCommand["type"] | null>(null); const [commandError, setCommandError] = useState<string | null>(null); const [backendError, setBackendError] = useState<string | null>(null); const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null); const [runtimeBusy, setRuntimeBusy] = useState(false); const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const refreshVersion = useRef(0);
+  const inFlightRefresh = useRef<Promise<void> | null>(null);
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastEventCursor = useRef<string | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const update = useCallback((patch: Partial<OperationsState>) => dispatch({ type: "patch", patch }), []);
   const hydrateCase = useCallback((snapshot: BackendCaseSnapshot | null) => { setActiveCase(snapshot); if (!snapshot) return; const inventory = snapshot.inventory[0]; const workOrder = snapshot.maintenanceWorkOrders[0]; const procurement = snapshot.procurementRequests[0]; const shipment = snapshot.shipmentImpacts[0]; update({ selectedWorkstationId: snapshot.workstation?.code ?? "", selectedComponentId: snapshot.part?.code ?? "", allocationBlocked: snapshot.allocationLocks.some((lock) => lock.state === "active"), bearingReserved: snapshot.reservations.some((item) => item.status === "active"), inventoryAvailable: Boolean(inventory && inventory.onHand - inventory.reserved > 0), inventoryState: inventory?.state === "reserved" ? "available" : inventory?.state ?? "unavailable", routingApproved: snapshot.reroutePlans.some((plan) => plan.state === "approved" || plan.state === "executed"), routingOutcome: snapshot.reroutePlans.some((plan) => plan.state === "approved" || plan.state === "executed") ? "approved" : "draft", maintenanceStage: workOrder?.stage ? Math.max(0, workOrder.stage - 1) : 0, maintenanceAssignee: workOrder?.assignee ?? "Unassigned", recoveryScenario: normalizeRecoveryScenario(workOrder?.scenario), procurementState: procurement?.state ?? "draft", procurementNotes: snapshot.procurementMessages.filter((item) => item.kind === "internal_note").map((item) => item.body), shipmentState: shipment?.state === "original" ? "no-impact" : shipment?.state === "notification_pending" ? "notification-pending" : shipment?.state ?? "no-impact", condition: "ready" }); }, [update]);
-  const refresh = useCallback(async () => { const version = ++refreshVersion.current; dispatch({ type: "patch", patch: { condition: "loading" } }); try { const [sessionResponse, overviewResponse] = await Promise.all([apiFetch("/api/auth/session"), apiFetch("/api/operations/overview")]); if (!overviewResponse.ok) throw new Error(`Operations API returned ${overviewResponse.status}.`); const session = sessionResponse.ok ? await sessionResponse.json() as { user: AuthenticatedUser | null } : { user: null }; const nextOverview = await overviewResponse.json() as Overview; if (version !== refreshVersion.current) return; setCurrentUser(session.user); if (session.user) update({ role: session.user.role }); setOverview(nextOverview); if (nextOverview.activeFailureCaseId) { const response = await apiFetch(`/api/failure-cases/${nextOverview.activeFailureCaseId}`); if (!response.ok) throw new Error(`Failure detail API returned ${response.status}.`); hydrateCase(await response.json() as BackendCaseSnapshot); } else { hydrateCase(null); dispatch({ type: "patch", patch: { condition: "ready", selectedWorkstationId: nextOverview.workstations[0]?.code ?? "" } }); } setBackendError(null); } catch (error) { if (version === refreshVersion.current) { setBackendError(error instanceof Error ? error.message : "Backend unavailable."); dispatch({ type: "patch", patch: { condition: "failed" } }); } } }, [hydrateCase, update]);
-  useEffect(() => { setApiRuntime(runtime); const saved = sessionStorage.getItem(`manufacture-flow:${runtime}:operations`); if (saved) { try { dispatch({ type: "patch", patch: JSON.parse(saved) as Partial<OperationsState> }); } catch { /* invalid cache ignored */ } } void refresh(); }, [runtime]);
+  const executeRefresh = useCallback(async () => {
+    const version = ++refreshVersion.current;
+    if (stateRef.current.condition !== "ready") {
+      dispatch({ type: "patch", patch: { condition: "loading" } });
+    }
+    try {
+      const [sessionResponse, overviewResponse] = await Promise.all([apiFetch("/api/auth/session"), apiFetch("/api/operations/overview")]);
+      if (!overviewResponse.ok) throw new Error(`Operations API returned ${overviewResponse.status}.`);
+      const session = sessionResponse.ok ? await sessionResponse.json() as { user: AuthenticatedUser | null } : { user: null };
+      const nextOverview = await overviewResponse.json() as Overview;
+      if (version !== refreshVersion.current) return;
+      setCurrentUser((prev) => {
+        if (!prev && !session.user) return null;
+        if (prev && session.user && prev.email === session.user.email && prev.role === session.user.role && prev.displayName === session.user.displayName) {
+          return prev;
+        }
+        return session.user;
+      });
+      if (session.user && stateRef.current.role !== session.user.role) {
+        update({ role: session.user.role });
+      }
+      setOverview(nextOverview);
+      if (nextOverview.activeFailureCaseId) {
+        const response = await apiFetch(`/api/failure-cases/${nextOverview.activeFailureCaseId}`);
+        if (!response.ok) throw new Error(`Failure detail API returned ${response.status}.`);
+        hydrateCase(await response.json() as BackendCaseSnapshot);
+      } else {
+        hydrateCase(null);
+        dispatch({ type: "patch", patch: { condition: "ready", selectedWorkstationId: nextOverview.workstations[0]?.code ?? "" } });
+      }
+      setBackendError(null);
+    } catch (error) {
+      if (version === refreshVersion.current) {
+        setBackendError(error instanceof Error ? error.message : "Backend unavailable.");
+        dispatch({ type: "patch", patch: { condition: "failed" } });
+      }
+    }
+  }, [hydrateCase, update]);
+  const refresh = useCallback(async () => {
+    if (inFlightRefresh.current) return inFlightRefresh.current;
+    const promise = executeRefresh().finally(() => { inFlightRefresh.current = null; });
+    inFlightRefresh.current = promise;
+    return promise;
+  }, [executeRefresh]);
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const scheduleDebouncedRefresh = useCallback(() => {
+    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    refreshTimer.current = setTimeout(() => { void refreshRef.current(); }, 350);
+  }, []);
+  useEffect(() => {
+    setApiRuntime(runtime);
+    setCurrentUser(null);
+    lastEventCursor.current = null;
+    const saved = sessionStorage.getItem(`manufacture-flow:${runtime}:operations`);
+    if (saved) {
+      try {
+        dispatch({ type: "patch", patch: JSON.parse(saved) as Partial<OperationsState> });
+      } catch { /* invalid cache ignored */ }
+    }
+    void refresh();
+  }, [runtime]);
   useEffect(() => { sessionStorage.setItem(`manufacture-flow:${runtime}:operations`, JSON.stringify(state)); document.documentElement.dataset.reducedMotion = String(state.reducedMotion); }, [runtime, state]);
-  useEffect(() => { if (!currentUser) { setRealtimeConnected(false); return; } const source = new EventSource(`${getApiBaseUrl(runtime)}/api/events`, { withCredentials: true }); source.addEventListener("connected", () => setRealtimeConnected(true)); source.addEventListener("workflow", () => void refresh()); source.onerror = () => setRealtimeConnected(false); return () => { source.close(); setRealtimeConnected(false); }; }, [currentUser, refresh, runtime]);
-  const runWorkflowCommand = useCallback(async (command: WorkflowCommand) => { if (!currentUser || !overview?.activeFailureCaseId) { setCommandError("An authenticated active failure case is required."); return false; } setPendingCommand(command.type); setCommandError(null); try { const response = await apiFetch(`/api/failure-cases/${overview.activeFailureCaseId}/actions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...command, actor: state.role }) }); const payload = await response.json() as { message?: string }; if (!response.ok) throw new Error(payload.message ?? `Workflow command returned ${response.status}.`); await refresh(); return true; } catch (error) { setCommandError(error instanceof Error ? error.message : "Workflow command failed."); return false; } finally { setPendingCommand(null); } }, [currentUser, overview?.activeFailureCaseId, refresh, state.role]);
+  useEffect(() => {
+    if (!currentUser) { setRealtimeConnected(false); return; }
+    const url = new URL(`${getApiBaseUrl(runtime)}/api/events`);
+    if (lastEventCursor.current) url.searchParams.set("after", lastEventCursor.current);
+    const source = new EventSource(url.toString(), { withCredentials: true });
+    source.addEventListener("connected", (event) => {
+      setRealtimeConnected(true);
+      try {
+        const data = JSON.parse((event as MessageEvent).data) as { cursor?: string };
+        if (data.cursor) lastEventCursor.current = data.cursor;
+      } catch { /* ignored */ }
+    });
+    source.addEventListener("workflow", (event) => {
+      try {
+        const data = JSON.parse((event as MessageEvent).data) as { occurredAt?: string };
+        if (data.occurredAt) lastEventCursor.current = data.occurredAt;
+      } catch { /* ignored */ }
+      scheduleDebouncedRefresh();
+    });
+    source.onerror = () => {
+      setRealtimeConnected(false);
+      source.close();
+    };
+    return () => {
+      source.close();
+      setRealtimeConnected(false);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
+  }, [currentUser?.email, runtime, scheduleDebouncedRefresh]);
+  const runWorkflowCommand = useCallback(async (command: WorkflowCommand) => {
+    const caseId = activeCase?.failureCase?.externalId ?? overview?.activeFailureCaseId;
+    if (!currentUser || !caseId) {
+      setCommandError("An authenticated active failure case is required.");
+      return false;
+    }
+    setPendingCommand(command.type);
+    setCommandError(null);
+    try {
+      const response = await apiFetch(`/api/failure-cases/${caseId}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...command, actor: state.role })
+      });
+      const payload = await response.json() as { message?: string };
+      if (!response.ok) throw new Error(payload.message ?? `Workflow command returned ${response.status}.`);
+      await refresh();
+      return true;
+    } catch (error) {
+      setCommandError(error instanceof Error ? error.message : "Workflow command failed.");
+      return false;
+    } finally {
+      setPendingCommand(null);
+    }
+  }, [currentUser, activeCase?.failureCase?.externalId, overview?.activeFailureCaseId, refresh, state.role]);
   const resetDemo = useCallback(async (scenario: DemoScenarioId = demoScenario) => { setRuntimeBusy(true); setApiRuntime("demo"); try { const response = await apiFetch("/api/demo-control/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario }) }, "demo"); if (!response.ok) throw new Error((await response.json() as { message?: string }).message ?? "Demo reset failed."); const auth = await apiFetch("/api/demo-control/session", { method: "POST" }, "demo"); if (!auth.ok) throw new Error("Demo Plant Manager session could not be established."); setDemoScenario(scenario); await refresh(); setBackendError(null); return true; } catch (error) { setBackendError(error instanceof Error ? error.message : "Demo reset failed."); return false; } finally { setRuntimeBusy(false); } }, [demoScenario, refresh]);
   const enterDemo = useCallback(async (scenario: DemoScenarioId, mode: StoryMode) => { setStoryMode(mode); setApiRuntime("demo"); setRuntime("demo"); return resetDemo(scenario); }, [resetDemo]);
   const triggerDemo = useCallback(async () => { setRuntimeBusy(true); try { const response = await apiFetch("/api/demo-control/trigger-telemetry", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario: demoScenario }) }, "demo"); if (!response.ok) throw new Error((await response.json() as { message?: string }).message ?? "Demo trigger failed."); await refresh(); return true; } catch (error) { setBackendError(error instanceof Error ? error.message : "Demo trigger failed."); return false; } finally { setRuntimeBusy(false); } }, [demoScenario, refresh]);
-  const exitDemo = useCallback(async () => { if (runtime === "demo") await apiFetch("/api/demo-control/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario: "golden" }) }, "demo").catch(() => undefined); setApiRuntime("live"); setRuntime("live"); setActiveCase(null); setOverview(null); }, [runtime]);
+  const exitDemo = useCallback(async () => { if (runtime === "demo") await apiFetch("/api/demo-control/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario: "golden" }) }, "demo").catch(() => undefined); setApiRuntime("live"); setRuntime("live"); setActiveCase(null); setOverview(null); setCurrentUser(null); }, [runtime]);
   const signOut = useCallback(async () => { await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined); setCurrentUser(null); }, []);
   const data = useMemo<OperationsData>(() => { if (!overview) return { ...demoOperationsSnapshot, workstations: [], failures: [] }; const failures: FailureCase[] = overview.failureCases.map((item) => ({ ...item, partId: activeCase?.part?.code ?? "Unavailable", detectedAt: "Persisted event", owner: "Production Supervisor" })); const workstations: Workstation[] = overview.workstations.map((item) => { const failure = failures.find((candidate) => candidate.stationId === item.code); const template = demoOperationsSnapshot.workstations.find((candidate) => candidate.id === item.code) ?? demoOperationsSnapshot.workstations[0]; return { ...template, id: item.code, name: item.name, line: item.line, status: statusForUi(item.status), capacity: item.capacityPercent, health: failure?.severity === "critical" ? "Critical" : failure ? "Degraded" : "Healthy", failureProb: failure?.probability ?? 0, predictedComponent: failure?.component ?? "No active prediction", estimatedTTF: failure ? `${failure.ttfHours} Hours` : "—", activeCaseId: failure?.id }; }); return { ...demoOperationsSnapshot, workstations, failures }; }, [activeCase?.part?.code, overview]);
   const value = useMemo<ContextValue>(() => ({ state, data, overview, activeCase, currentCaseId: overview?.activeFailureCaseId ?? null, runtime, demoScenario, storyMode, runtimeBusy, backendError, realtimeConnected, update, reset: () => dispatch({ type: "reset" }), refresh, runWorkflowCommand, pendingCommand, commandError, clearCommandError: () => setCommandError(null), currentUser, signOut, enterDemo, resetDemo, triggerDemo, exitDemo }), [state, data, overview, activeCase, runtime, demoScenario, storyMode, runtimeBusy, backendError, realtimeConnected, update, refresh, runWorkflowCommand, pendingCommand, commandError, currentUser, signOut, enterDemo, resetDemo, triggerDemo, exitDemo]);

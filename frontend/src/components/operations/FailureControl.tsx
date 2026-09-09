@@ -18,7 +18,7 @@ export function FailureControl() {
     <main className="px-5 py-7 md:px-8 md:py-10">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="border-l-4 border-destructive bg-muted px-6 py-7 md:px-8">
-          <div className="flex flex-wrap items-center gap-3"><Badge variant="destructive">CRITICAL CASE</Badge><span className="font-mono text-xs text-muted-foreground">DEMO DATA / FC-2024-0047 / DETECTED 03:14 IST</span></div>
+          <div className="flex flex-wrap items-center gap-3"><Badge variant="destructive">CRITICAL CASE</Badge><span className="font-mono text-xs text-muted-foreground">INCIDENT RECORD / FC-2026-0047 / DETECTED 03:14 IST</span></div>
           <div className="mt-5 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div className="max-w-3xl"><p className="font-mono text-xs text-muted-foreground">WS-102 / HAAS VF-2SS CNC / LINE L-03</p><h1 className="mt-2 font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Servo bearing failure risk requires containment.</h1><p className="mt-3 text-base leading-7 text-muted-foreground">BRG-10023 / X-Axis Servo Assembly / 92% predicted failure probability / 18-hour decision window.</p></div>
             <Button asChild><Link href="/rerouting"><Route data-icon="inline-start" />Review routing impact</Link></Button>

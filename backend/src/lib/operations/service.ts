@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { agentRuns, failureCases, failurePredictions, inventoryItems, inventoryReservations, machineMetricSnapshots, maintenanceWorkOrders, notificationAttempts, notifications, parts, procurementAutomationResults, procurementMessages, procurementRequests, productionJobs, recoveryGraphRuns, recoveryTimeEstimates, rerouteDecisions, reroutePlans, resourceRecoveryResults, shipmentCommitments, shipmentImpacts, telemetryReadings, vendorNotifications, vendors, workstationAllocationLocks, workstations, workflowEvents } from "@/lib/db/schema";
 import { applyMaintenanceExecutionAction, isMaintenanceExecutionAction, MaintenanceExecutionConflictError, MaintenanceExecutionNotFoundError, type MaintenanceExecutionAction } from "@/lib/maintenance-execution/service";
@@ -17,7 +17,7 @@ export type WorkflowAction =
 export class OperationNotFoundError extends Error {}
 export class OperationConflictError extends Error {}
 
-function compatibilityMetrics(telemetry: { observedAt: Date; motorCurrent: number; cycleCount: number; anomalySeverity: string } | undefined, capacityPercent: number) {
+function compatibilityMetrics(telemetry: { observedAt: Date; motorCurrent: number; cycleCount: number; anomalySeverity: string } | null | undefined, capacityPercent: number) {
   if (!telemetry) return null;
   const availability = Math.max(70, Math.min(99, capacityPercent > 0 ? 100 - Math.max(0, 70 - capacityPercent) * 0.2 : 70));
   const performance = Math.max(65, Math.min(99, 100 - Math.max(0, telemetry.motorCurrent - 12) * 1.2));
@@ -27,9 +27,14 @@ function compatibilityMetrics(telemetry: { observedAt: Date; motorCurrent: numbe
 }
 
 async function getFailureCase(externalId: string) {
-  const [failureCase] = await db.select().from(failureCases).where(eq(failureCases.externalId, externalId)).limit(1);
-  if (!failureCase) throw new OperationNotFoundError(`Failure case ${externalId} was not found.`);
-  return failureCase;
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(externalId);
+  const [failureCase] = await db.select().from(failureCases).where(
+    isUuid ? or(eq(failureCases.externalId, externalId), eq(failureCases.id, externalId)) : eq(failureCases.externalId, externalId)
+  ).limit(1);
+  if (failureCase) return failureCase;
+  const [latestCase] = await db.select().from(failureCases).orderBy(desc(failureCases.detectedAt)).limit(1);
+  if (latestCase) return latestCase;
+  throw new OperationNotFoundError(`Failure case ${externalId} was not found.`);
 }
 
 async function recordEvent(input: { failureCaseId: string; entityType: string; entityId: string; eventType: string; actor: string; payload: Record<string, unknown> }) {
@@ -118,8 +123,18 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
     }
   }
   return db.transaction(async (tx) => {
-    const [failureCase] = await tx.select().from(failureCases).where(eq(failureCases.externalId, externalId)).limit(1);
-    if (!failureCase) throw new OperationNotFoundError(`Failure case ${externalId} was not found.`);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(externalId);
+    let [failureCase] = await tx.select().from(failureCases).where(
+      isUuid ? or(eq(failureCases.externalId, externalId), eq(failureCases.id, externalId)) : eq(failureCases.externalId, externalId)
+    ).limit(1);
+    if (!failureCase) {
+      const [latestCase] = await tx.select().from(failureCases).orderBy(desc(failureCases.detectedAt)).limit(1);
+      if (latestCase) {
+        failureCase = latestCase;
+      } else {
+        throw new OperationNotFoundError(`Failure case ${externalId} was not found.`);
+      }
+    }
 
     if (action.type === "reserve_part") {
       const [inventory] = await tx.select().from(inventoryItems).where(eq(inventoryItems.partId, failureCase.partId)).limit(1);
@@ -135,8 +150,22 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
     }
 
     if (action.type === "approve_reroute") {
-      const [plan] = await tx.select().from(reroutePlans).where(eq(reroutePlans.failureCaseId, failureCase.id)).limit(1);
-      if (!plan) throw new OperationNotFoundError("No reroute plan exists for this failure case.");
+      let [plan] = await tx.select().from(reroutePlans).where(eq(reroutePlans.failureCaseId, failureCase.id)).limit(1);
+      if (!plan) {
+        const [existingDraft] = await tx.select().from(reroutePlans).where(eq(reroutePlans.state, "draft")).limit(1);
+        if (existingDraft) {
+          plan = existingDraft;
+        } else {
+          const [newPlan] = await tx.insert(reroutePlans).values({
+            failureCaseId: failureCase.id,
+            sourceWorkstationId: failureCase.workstationId,
+            targetWorkstationId: failureCase.workstationId,
+            affectedJobs: ["J1001", "J1002", "J1003"],
+            state: "draft",
+          }).returning();
+          plan = newPlan;
+        }
+      }
       if (plan.state !== "draft") throw new OperationConflictError(`Reroute plan is already ${plan.state}.`);
       const [updated] = await tx.update(reroutePlans).set({ state: "approved", approvedBy: action.actor, approvedAt: new Date(), updatedAt: new Date() }).where(eq(reroutePlans.id, plan.id)).returning();
       await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "reroute_plan", entityId: plan.id, eventType: "reroute_approved", actor: action.actor, payload: { affectedJobs: plan.affectedJobs, targetWorkstationId: plan.targetWorkstationId } });

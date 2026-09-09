@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response(JSON.stringify({ error: "AUTHENTICATION_REQUIRED" }), { status: 401, headers: { "content-type": "application/json" } });
   const requestedCursor = new URL(request.url).searchParams.get("after");
-  const initialCursor = requestedCursor && !Number.isNaN(Date.parse(requestedCursor)) ? new Date(requestedCursor) : new Date(Date.now() - 60_000);
+  const initialCursor = requestedCursor && !Number.isNaN(Date.parse(requestedCursor)) ? new Date(requestedCursor) : new Date();
   const encoder = new TextEncoder();
   let cursor = initialCursor;
   let closed = false;

@@ -33,6 +33,7 @@ export const metadata: Metadata = {
   description: "Industrial operations command center",
 };
 
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,6 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-scroll-behavior="smooth"
       className={cn(manrope.variable, ibmPlexSans.variable, ibmPlexMono.variable)}
     >
       <head>
