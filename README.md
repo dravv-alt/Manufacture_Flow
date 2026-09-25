@@ -204,6 +204,8 @@ npm run build
 
 Deploy `frontend/` to Vercel and two Railway API services from the same backend Dockerfile. The browser must use public HTTPS backend URLs; it cannot resolve the Docker service name `backend`.
 
+Keep the Vercel project Root Directory at the repository root. The checked-in `vercel.json` builds only `frontend/` and uses `frontend/.next` as the output directory; do not override it to the repository-level `.next`.
+
 Vercel frontend variables:
 
 ```text
