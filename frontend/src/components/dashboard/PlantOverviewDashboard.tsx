@@ -1,7 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, Bot, Check, Ellipsis, Factory, Package, Pencil, Plus, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bot,
+  Check,
+  Ellipsis,
+  Factory,
+  Package,
+  Pencil,
+  Plus,
+  Search,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useOperations } from "@/contexts/OperationsContext";
 import type { CalendarEvent } from "@/demo-data/operations";
@@ -13,19 +24,46 @@ import { FunctionalHealthTable } from "@/components/dashboard/FunctionalHealthTa
 
 // demo_data
 const weekdayLabels = ["M", "T", "W", "T", "F", "S", "S"];
-const initialCalendarMonth = new Date(2026, 7, 1);
-const calendarMonthLabels = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const calendarYears = [2025, 2026, 2027];
+const initialCalendarMonth = new Date();
+const calendarMonthLabels = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const calendarYears = [initialCalendarMonth.getFullYear() - 1, initialCalendarMonth.getFullYear(), initialCalendarMonth.getFullYear() + 1];
 
 export function PlantOverviewDashboard() {
-  const { data, state, update, overview } = useOperations();
+  const { data, state, update, overview, runWorkflowCommand } = useOperations();
   const [query, setQuery] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [reportExported, setReportExported] = useState(false);
-  const workstations = data.workstations && data.workstations.length > 0 ? data.workstations : demoWorkstations;
-  const selectedStation = workstations.find((station) => station.id === state.selectedWorkstationId) ?? workstations[0] ?? demoWorkstations[0];
+  const [maintenanceNotice, setMaintenanceNotice] = useState<string | null>(null);
+  const workstations =
+    data.workstations && data.workstations.length > 0
+      ? data.workstations
+      : demoWorkstations;
+  const selectedStation =
+    workstations.find(
+      (station) => station.id === state.selectedWorkstationId,
+    ) ??
+    workstations[0] ??
+    demoWorkstations[0];
   const visibleWorkstations = useMemo(
-    () => workstations.filter((station) => `${station.id} ${station.name} ${station.predictedComponent}`.toLowerCase().includes(query.toLowerCase())),
+    () =>
+      workstations.filter((station) =>
+        `${station.id} ${station.name} ${station.predictedComponent}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+      ),
     [query, workstations],
   );
 
@@ -34,8 +72,16 @@ export function PlantOverviewDashboard() {
     setDrawerOpen(true);
   };
 
-  const scheduleMaintenance = (station: Workstation) => {
-    update({ selectedWorkstationId: station.id, maintenanceStage: Math.max(state.maintenanceStage, 3) });
+  const scheduleMaintenance = async (station: Workstation) => {
+    update({ selectedWorkstationId: station.id });
+    if (station.id !== "WS-102") {
+      setMaintenanceNotice(`${station.id} has no active simulated failure case. Open WS-102 to run the recovery workflow.`);
+      window.setTimeout(() => setMaintenanceNotice(null), 5000);
+      return;
+    }
+    const saved = await runWorkflowCommand({ type: "schedule_maintenance" });
+    setMaintenanceNotice(saved ? `Maintenance request saved for ${station.id}. Open Maintenance to continue.` : `Maintenance for ${station.id} was not changed. Review the action message.`);
+    window.setTimeout(() => setMaintenanceNotice(null), 5000);
   };
 
   const throttleProduction = (station: Workstation) => {
@@ -43,8 +89,23 @@ export function PlantOverviewDashboard() {
   };
 
   const exportDashboardReport = () => {
-    const rows = workstations.map((station) => [station.id, station.name, station.status, `${station.failureProb}%`, station.estimatedTTF].join(","));
-    const file = new Blob([["Workstation,Name,Status,Failure risk,Estimated TTF", ...rows].join("\n")], { type: "text/csv;charset=utf-8" });
+    const rows = workstations.map((station) =>
+      [
+        station.id,
+        station.name,
+        station.status,
+        `${station.failureProb}%`,
+        station.estimatedTTF,
+      ].join(","),
+    );
+    const file = new Blob(
+      [
+        ["Workstation,Name,Status,Failure risk,Estimated TTF", ...rows].join(
+          "\n",
+        ),
+      ],
+      { type: "text/csv;charset=utf-8" },
+    );
     const url = URL.createObjectURL(file);
     const link = document.createElement("a");
     link.href = url;
@@ -60,136 +121,823 @@ export function PlantOverviewDashboard() {
       <div className="mx-auto w-full max-w-[1440px] lg:pl-10">
         <header className="mb-10 flex flex-col justify-between gap-5 pt-1 md:flex-row md:items-start">
           <div>
-            <h1 className="text-[32px] font-semibold tracking-[-0.02em]">Hi, Plant Manager!</h1>
-            <p className="mt-2 text-base text-[#46464a]">Here is the current status of the manufacturing floor.</p>
+            <h1 className="text-[32px] font-semibold tracking-[-0.02em]">
+              Hi, Plant Manager!
+            </h1>
+            <p className="mt-2 text-base text-[#46464a]">
+              Here is the current status of the manufacturing floor.
+            </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><StoryLauncher />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <StoryLauncher />
             <label className="relative">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#46464a]" />
-              <span className="sr-only">Search for machines, anomalies, or parts</span>
-              <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 w-full rounded-full bg-white pl-11 pr-5 text-sm shadow-[0_10px_20px_rgba(0,0,0,0.03)] outline-none placeholder:text-[#77767b] focus:ring-2 focus:ring-black sm:w-80" placeholder="Search for machines, anomalies, or parts..." />
+              <span className="sr-only">
+                Search for machines, anomalies, or parts
+              </span>
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                className="h-12 w-full rounded-full bg-white pl-11 pr-5 text-sm shadow-[0_10px_20px_rgba(0,0,0,0.03)] outline-none placeholder:text-[#77767b] focus:ring-2 focus:ring-black sm:w-80"
+                placeholder="Search for machines, anomalies, or parts..."
+              />
             </label>
-            <button onClick={exportDashboardReport} className="h-12 rounded-full bg-black px-6 text-xs font-semibold tracking-[0.05em] text-white shadow-md transition-colors hover:bg-[#313030]">{reportExported ? "Report Downloaded" : "Export Report"}</button>
+            <button
+              onClick={exportDashboardReport}
+              className="h-12 rounded-full bg-black px-6 text-xs font-semibold tracking-[0.05em] text-white shadow-md transition-colors hover:bg-[#313030]"
+            >
+              {reportExported ? "Report Downloaded" : "Export Report"}
+            </button>
           </div>
         </header>
 
         <RecoverySuccessBanner />
 
         <section className="grid grid-cols-12 gap-6">
-          <RiskCard workstations={workstations} selectedId={selectedStation.id} onOpenStation={openStationTelemetry} />
-          <MaintenanceCalendar events={data.calendar} onOpenStation={openStationTelemetry} />
+          <RiskCard
+            workstations={workstations}
+            selectedId={selectedStation.id}
+            onOpenStation={openStationTelemetry}
+          />
+          <MaintenanceCalendar
+            events={data.calendar}
+            onOpenStation={openStationTelemetry}
+          />
           <OeeCard workstations={workstations} overview={overview} />
           <EnergyCard overview={overview} />
-          <MonitoredStations workstations={workstations.slice(0, 4)} selectedId={selectedStation.id} onOpenStation={openStationTelemetry} />
+          <MonitoredStations
+            workstations={workstations.slice(0, 4)}
+            selectedId={selectedStation.id}
+            onOpenStation={openStationTelemetry}
+          />
         </section>
         <ActivePredictionsPanel failures={data.failures} />
-        <FunctionalHealthTable workstations={visibleWorkstations} onOpenStation={openStationTelemetry} />
+        <FunctionalHealthTable
+          workstations={visibleWorkstations}
+          onOpenStation={openStationTelemetry}
+        />
       </div>
-      <TelemetryDrawer open={drawerOpen} station={selectedStation} onClose={() => setDrawerOpen(false)} onSchedule={scheduleMaintenance} onThrottle={throttleProduction} />
+      <TelemetryDrawer
+        open={drawerOpen}
+        station={selectedStation}
+        onClose={() => setDrawerOpen(false)}
+        onSchedule={scheduleMaintenance}
+        onThrottle={throttleProduction}
+      />
+      {maintenanceNotice ? <div role="status" aria-live="polite" className="fixed bottom-6 right-6 z-50 max-w-md rounded-2xl bg-[#242323] px-5 py-4 text-sm font-medium text-white shadow-2xl">{maintenanceNotice}</div> : null}
     </main>
   );
 }
 
-function ActivePredictionsPanel({ failures }: { failures: readonly { id: string; stationId: string; component: string; severity: "critical" | "warning"; probability: number; ttfHours: number; }[] }) {
-  const predictions = [...failures].sort((left, right) => right.probability - left.probability).slice(0, 3);
-  return <section className="mt-6 overflow-hidden rounded-[2rem] bg-[#242323] p-6 text-[#f8f5f2] shadow-[0_28px_42px_rgba(0,0,0,0.10)] md:p-7"><div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end"><div><p className="text-[10px] font-bold tracking-[0.16em] text-amber-300">PREDICTIVE PRIORITY QUEUE</p><h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">Active failure predictions</h2><p className="mt-1 text-sm text-white/60">Ranked by probability and remaining intervention window.</p></div><span className="inline-flex w-max items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/80"><i className="size-2 rounded-full bg-emerald-400 animate-pulse" />EDGE INFERENCE ENGINE ACTIVE</span></div><div className="mt-5 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">{predictions.map((failure) => <Link key={failure.id} href={`/failure/${failure.id}`} className="group min-h-36 rounded-[1.35rem] border border-white/10 bg-white/[0.06] p-5 transition-colors hover:bg-white/[0.12] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"><div className="flex items-start justify-between gap-3"><span className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.06em] text-white/70"><AlertTriangle className={failure.severity === "critical" ? "size-4 text-rose-300" : "size-4 text-amber-300"} />{failure.stationId}</span><span className={cn("rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.07em]", failure.severity === "critical" ? "bg-rose-300 text-[#4e1111]" : "bg-amber-300 text-[#372800]")}>{failure.probability}% RISK</span></div><p className="mt-4 text-base font-semibold">{failure.component}</p><div className="mt-3 flex items-center justify-between text-xs text-white/60"><span>{failure.ttfHours}h intervention window</span><span className="flex items-center gap-1 font-semibold text-white">Open case <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" /></span></div></Link>)}</div></section>;
-}
-
-function RiskCard({ workstations, selectedId, onOpenStation }: { workstations: readonly Workstation[]; selectedId: string; onOpenStation: (id: string) => void }) {
-  const [showSummary, setShowSummary] = useState(false);
-  const ws102 = workstations.find((station) => station.id === "WS-102") ?? workstations[0];
-  const ws108 = workstations.find((station) => station.id === "WS-108") ?? workstations[0];
-  const atRiskStations = workstations.filter((station) => station.status === "At Risk" || station.health === "Critical");
-  const highestRisk = [...workstations].sort((left, right) => right.failureProb - left.failureProb)[0];
-
+function ActivePredictionsPanel({
+  failures,
+}: {
+  failures: readonly {
+    id: string;
+    stationId: string;
+    component: string;
+    severity: "critical" | "warning";
+    probability: number;
+    ttfHours: number;
+  }[];
+}) {
+  const predictions = [...failures]
+    .sort((left, right) => right.probability - left.probability)
+    .slice(0, 3);
   return (
-    <section className="relative col-span-12 flex h-[400px] flex-col justify-between overflow-hidden rounded-[2rem] bg-white p-8 shadow-[0_40px_40px_rgba(0,0,0,0.04)] lg:col-span-7">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,#e7e1d2_0%,transparent_60%),radial-gradient(circle_at_30%_70%,#efeadc_0%,transparent_50%)]" />
-      <div className="relative z-10 flex items-start justify-between">
-        <div><h2 className="text-xl font-semibold">Overall Plant Risk Level</h2><p className="mt-1 text-xs font-medium text-[#66636a]">Select a risk signal to inspect its live workstation telemetry.</p></div>
-        <button onClick={() => setShowSummary((current) => !current)} aria-expanded={showSummary} aria-label="Toggle plant-risk summary" className="grid size-8 place-items-center rounded-full bg-white/60 shadow-sm transition-transform hover:scale-105"><Ellipsis className="size-4" /></button>
-      </div>
-      {showSummary && <div className="relative z-20 -mb-4 mt-3 rounded-2xl bg-white/90 px-4 py-3 text-xs shadow-sm backdrop-blur"><strong>{atRiskStations.length} stations need attention.</strong><span className="ml-2 text-[#5b575a]">Highest current signal: {highestRisk.id} at {highestRisk.failureProb}% risk.</span></div>}
-      <div className="relative z-10 flex flex-1 items-center justify-center">
-        <div className="relative h-full w-full max-w-sm">
-          <RiskBubble station={ws108} color="bg-[#ba1a1a]/90" className="right-1/4 top-1/4 z-20 size-32 text-white" selected={selectedId === ws108.id} onClick={() => onOpenStation(ws108.id)} label={`Arm (${ws108.failureProb}% Risk)`} />
-          <RiskBubble station={ws102} color="bg-amber-400/90" className="bottom-1/4 left-1/4 z-10 size-40 text-black" selected={selectedId === ws102.id} onClick={() => onOpenStation(ws102.id)} label={`CNC (${ws102.failureProb}% Risk)`} />
-          <button onClick={() => onOpenStation(highestRisk.id)} className="absolute left-10 top-10 flex size-24 flex-col items-center justify-center rounded-full bg-[#313030]/90 text-[#f4f0ef] shadow-lg transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black" aria-label={`Inspect highest risk anomaly: ${highestRisk.id}`}>
-            <span className="text-xl font-semibold">{atRiskStations.length + 12}</span><span className="text-center text-xs font-semibold tracking-[0.05em] text-white/70">Anomalies</span>
-          </button>
+    <section className="mt-6 overflow-hidden rounded-[2rem] bg-[#242323] p-6 text-[#f8f5f2] shadow-[0_28px_42px_rgba(0,0,0,0.10)] md:p-7">
+      <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.16em] text-amber-300">
+            PREDICTIVE PRIORITY QUEUE
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-[-0.025em]">
+            Active failure predictions
+          </h2>
+          <p className="mt-1 text-sm text-white/60">
+            Ranked by probability and remaining intervention window.
+          </p>
         </div>
+        <span className="inline-flex w-max items-center gap-2 rounded-full border border-white/15 px-3 py-2 text-xs font-semibold text-white/80">
+          <i className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+          EDGE INFERENCE ENGINE ACTIVE
+        </span>
       </div>
-      <div className="relative z-10 flex flex-col gap-2 text-xs font-semibold tracking-[0.05em]">
-        <Legend color="bg-[#ba1a1a]" label="Critical Failure Imminent" /><Legend color="bg-amber-400" label="High Wear Detected" /><Legend color="bg-[#313030]" label="Normal Operation" />
+      <div className="mt-5 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {predictions.map((failure) => (
+          <Link
+            key={failure.id}
+            href={`/failure/${failure.id}`}
+            className="group min-h-36 rounded-[1.35rem] border border-white/10 bg-white/[0.06] p-5 transition-colors hover:bg-white/[0.12] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <span className="inline-flex items-center gap-2 text-xs font-bold tracking-[0.06em] text-white/70">
+                <AlertTriangle
+                  className={
+                    failure.severity === "critical"
+                      ? "size-4 text-rose-300"
+                      : "size-4 text-amber-300"
+                  }
+                />
+                {failure.stationId}
+              </span>
+              <span
+                className={cn(
+                  "rounded-full px-2.5 py-1 text-[10px] font-bold tracking-[0.07em]",
+                  failure.severity === "critical"
+                    ? "bg-rose-300 text-[#4e1111]"
+                    : "bg-amber-300 text-[#372800]",
+                )}
+              >
+                {failure.probability}% RISK
+              </span>
+            </div>
+            <p className="mt-4 text-base font-semibold">{failure.component}</p>
+            <div className="mt-3 flex items-center justify-between text-xs text-white/60">
+              <span>{failure.ttfHours}h intervention window</span>
+              <span className="flex items-center gap-1 font-semibold text-white">
+                Open case{" "}
+                <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </div>
+          </Link>
+        ))}
+        {predictions.length === 0 ? <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.06] p-5 text-sm text-white/70 lg:col-span-2 xl:col-span-3">No persisted failure cases are available for this session. In the controlled demo, open the Story Launcher, enter a demo scenario, and trigger telemetry; a case is recorded only when the deterministic risk rules cross the failure threshold.</div> : null}
       </div>
     </section>
   );
 }
 
-function RiskBubble({ station, color, className, selected, label, onClick }: { station: Workstation; color: string; className: string; selected: boolean; label: string; onClick: () => void }) {
-  return <button onClick={onClick} aria-pressed={selected} className={cn("absolute flex flex-col items-center justify-center rounded-full shadow-xl backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black", color, className, selected && "ring-4 ring-black/20 ring-offset-4")}><span className="text-xl font-semibold">{station.id}</span><span className="text-center text-xs font-semibold tracking-[0.05em] opacity-75">{label}</span></button>;
+function RiskCard({
+  workstations,
+  selectedId,
+  onOpenStation,
+}: {
+  workstations: readonly Workstation[];
+  selectedId: string;
+  onOpenStation: (id: string) => void;
+}) {
+  const [showSummary, setShowSummary] = useState(false);
+  const ws102 =
+    workstations.find((station) => station.id === "WS-102") ?? workstations[0];
+  const ws108 =
+    workstations.find((station) => station.id === "WS-108") ?? workstations[0];
+  const atRiskStations = workstations.filter(
+    (station) => station.status === "At Risk" || station.health === "Critical",
+  );
+  const highestRisk = [...workstations].sort(
+    (left, right) => right.failureProb - left.failureProb,
+  )[0];
+
+  return (
+    <section className="relative col-span-12 flex h-[400px] flex-col justify-between overflow-hidden rounded-[2rem] bg-white p-8 shadow-[0_40px_40px_rgba(0,0,0,0.04)] lg:col-span-7">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,#e7e1d2_0%,transparent_60%),radial-gradient(circle_at_30%_70%,#efeadc_0%,transparent_50%)]" />
+      <div className="relative z-10 flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Overall Plant Risk Level</h2>
+          <p className="mt-1 text-xs font-medium text-[#66636a]">
+            Select a risk signal to inspect its live workstation telemetry.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowSummary((current) => !current)}
+          aria-expanded={showSummary}
+          aria-label="Toggle plant-risk summary"
+          className="grid size-8 place-items-center rounded-full bg-white/60 shadow-sm transition-transform hover:scale-105"
+        >
+          <Ellipsis className="size-4" />
+        </button>
+      </div>
+      {showSummary && (
+        <div className="relative z-20 -mb-4 mt-3 rounded-2xl bg-white/90 px-4 py-3 text-xs shadow-sm backdrop-blur">
+          <strong>{atRiskStations.length} stations need attention.</strong>
+          <span className="ml-2 text-[#5b575a]">
+            Highest current signal: {highestRisk.id} at{" "}
+            {highestRisk.failureProb}% risk.
+          </span>
+        </div>
+      )}
+      <div className="relative z-10 flex flex-1 items-center justify-center">
+        <div className="relative h-full w-full max-w-sm">
+          <RiskBubble
+            station={ws108}
+            color="bg-[#ba1a1a]/90"
+            className="right-1/4 top-1/4 z-20 size-32 text-white"
+            selected={selectedId === ws108.id}
+            onClick={() => onOpenStation(ws108.id)}
+            label={`Arm (${ws108.failureProb}% Risk)`}
+          />
+          <RiskBubble
+            station={ws102}
+            color="bg-amber-400/90"
+            className="bottom-1/4 left-1/4 z-10 size-40 text-black"
+            selected={selectedId === ws102.id}
+            onClick={() => onOpenStation(ws102.id)}
+            label={`CNC (${ws102.failureProb}% Risk)`}
+          />
+          <button
+            onClick={() => onOpenStation(highestRisk.id)}
+            className="absolute left-10 top-10 flex size-24 flex-col items-center justify-center rounded-full bg-[#313030]/90 text-[#f4f0ef] shadow-lg transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black"
+            aria-label={`Inspect highest risk anomaly: ${highestRisk.id}`}
+          >
+            <span className="text-xl font-semibold">
+              {atRiskStations.length + 12}
+            </span>
+            <span className="text-center text-xs font-semibold tracking-[0.05em] text-white/70">
+              Anomalies
+            </span>
+          </button>
+        </div>
+      </div>
+      <div className="relative z-10 flex flex-col gap-2 text-xs font-semibold tracking-[0.05em]">
+        <Legend color="bg-[#ba1a1a]" label="Critical Failure Imminent" />
+        <Legend color="bg-amber-400" label="High Wear Detected" />
+        <Legend color="bg-[#313030]" label="Normal Operation" />
+      </div>
+    </section>
+  );
 }
 
-function MaintenanceCalendar({ events, onOpenStation }: { events: readonly CalendarEvent[]; onOpenStation: (id: string) => void }) {
-  const [selectedMonth, setSelectedMonth] = useState(initialCalendarMonth.getMonth());
-  const [selectedYear, setSelectedYear] = useState(initialCalendarMonth.getFullYear());
-  const [selectedDate, setSelectedDate] = useState("2026-08-10");
+function RiskBubble({
+  station,
+  color,
+  className,
+  selected,
+  label,
+  onClick,
+}: {
+  station: Workstation;
+  color: string;
+  className: string;
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={selected}
+      className={cn(
+        "absolute flex flex-col items-center justify-center rounded-full shadow-xl backdrop-blur-sm transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black",
+        color,
+        className,
+        selected && "ring-4 ring-black/20 ring-offset-4",
+      )}
+    >
+      <span className="text-xl font-semibold">{station.id}</span>
+      <span className="text-center text-xs font-semibold tracking-[0.05em] opacity-75">
+        {label}
+      </span>
+    </button>
+  );
+}
+
+function MaintenanceCalendar({
+  events,
+  onOpenStation,
+}: {
+  events: readonly CalendarEvent[];
+  onOpenStation: (id: string) => void;
+}) {
+  const [selectedMonth, setSelectedMonth] = useState(
+    initialCalendarMonth.getMonth(),
+  );
+  const [selectedYear, setSelectedYear] = useState(
+    initialCalendarMonth.getFullYear(),
+  );
+  const [selectedDate, setSelectedDate] = useState(() => `${initialCalendarMonth.getFullYear()}-${String(initialCalendarMonth.getMonth() + 1).padStart(2, "0")}-${String(initialCalendarMonth.getDate()).padStart(2, "0")}`);
   const currentMonth = new Date(selectedYear, selectedMonth, 1);
   const year = currentMonth.getFullYear();
   const month = currentMonth.getMonth();
   const firstWeekday = (currentMonth.getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const eventByDate = new Map(events.map((event) => [event.date, event]));
-  const dateKey = (day: number) => `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  const dateKey = (day: number) =>
+    `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   const selectCalendarMonth = (monthValue: number, yearValue: number) => {
     setSelectedMonth(monthValue);
     setSelectedYear(yearValue);
-    setSelectedDate(`${yearValue}-${String(monthValue + 1).padStart(2, "0")}-01`);
+    setSelectedDate(
+      `${yearValue}-${String(monthValue + 1).padStart(2, "0")}-01`,
+    );
   };
 
   return (
     <section className="col-span-12 flex h-[400px] flex-col overflow-hidden rounded-[2rem] bg-[#313030] p-6 text-[#f4f0ef] shadow-[0_40px_40px_rgba(0,0,0,0.08)] lg:col-span-5 lg:p-7">
-      <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between"><h2 className="text-xl font-semibold">Maintenance Schedule</h2><div className="flex gap-2"><label className="sr-only" htmlFor="maintenance-month">Select maintenance month</label><select id="maintenance-month" value={selectedMonth} onChange={(event) => selectCalendarMonth(Number(event.target.value), selectedYear)} className="h-8 min-w-0 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs text-[#f4f0ef] outline-none transition-colors hover:bg-white/15 focus:ring-2 focus:ring-white"><option className="bg-[#313030]" value="" disabled>Select month</option>{calendarMonthLabels.map((monthLabel, index) => <option className="bg-[#313030]" key={monthLabel} value={index}>{monthLabel}</option>)}</select><label className="sr-only" htmlFor="maintenance-year">Select maintenance year</label><select id="maintenance-year" value={selectedYear} onChange={(event) => selectCalendarMonth(selectedMonth, Number(event.target.value))} className="h-8 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs text-[#f4f0ef] outline-none transition-colors hover:bg-white/15 focus:ring-2 focus:ring-white">{calendarYears.map((calendarYear) => <option className="bg-[#313030]" key={calendarYear} value={calendarYear}>{calendarYear}</option>)}</select></div></div>
-      <div className="grid flex-1 grid-cols-7 content-start gap-y-1 text-center text-sm">{weekdayLabels.map((day, index) => <span key={`${day}-${index}`} className="text-[10px] font-semibold tracking-[0.05em] text-[#c9c6c1]">{day}</span>)}{Array.from({ length: firstWeekday }, (_, index) => <span key={`blank-${index}`} />)}{Array.from({ length: daysInMonth }, (_, index) => { const day = index + 1; const key = dateKey(day); const event = eventByDate.get(key); const isSelected = key === selectedDate; return <button key={key} onClick={() => { setSelectedDate(key); if (event) onOpenStation(event.workstationId); }} aria-pressed={isSelected} aria-label={`${key}${event ? `: ${event.title}` : ""}`} className="relative mx-auto grid size-7 place-items-center rounded-full text-xs transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"><i className={cn("absolute inset-0 rounded-full", event?.type === "scheduled" && "border border-amber-400", event?.type === "completed" && "bg-amber-400", event?.type === "critical" && "bg-[#ba1a1a]", isSelected && !event && "bg-white/15", isSelected && "ring-2 ring-white ring-offset-2 ring-offset-[#313030]")} /><b className={cn("relative text-xs", event?.type === "completed" && "text-black")}>{day}</b></button>; })}</div>
-      <div className="mt-2 flex shrink-0 flex-wrap gap-3 border-t border-white/15 pt-2 text-[9px] font-semibold tracking-[0.05em] text-[#c9c6c1]"><Legend color="border border-amber-400" label="Scheduled" small /><Legend color="bg-amber-400" label="Maintenance Done" small /><Legend color="bg-[#ba1a1a]" label="Critical" small /></div>
+      <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-xl font-semibold">Maintenance Schedule</h2>
+        <div className="flex gap-2">
+          <label className="sr-only" htmlFor="maintenance-month">
+            Select maintenance month
+          </label>
+          <select
+            id="maintenance-month"
+            value={selectedMonth}
+            onChange={(event) =>
+              selectCalendarMonth(Number(event.target.value), selectedYear)
+            }
+            className="h-8 min-w-0 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs text-[#f4f0ef] outline-none transition-colors hover:bg-white/15 focus:ring-2 focus:ring-white"
+          >
+            <option className="bg-[#313030]" value="" disabled>
+              Select month
+            </option>
+            {calendarMonthLabels.map((monthLabel, index) => (
+              <option className="bg-[#313030]" key={monthLabel} value={index}>
+                {monthLabel}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="maintenance-year">
+            Select maintenance year
+          </label>
+          <select
+            id="maintenance-year"
+            value={selectedYear}
+            onChange={(event) =>
+              selectCalendarMonth(selectedMonth, Number(event.target.value))
+            }
+            className="h-8 rounded-full border border-white/15 bg-white/10 px-2.5 text-xs text-[#f4f0ef] outline-none transition-colors hover:bg-white/15 focus:ring-2 focus:ring-white"
+          >
+            {calendarYears.map((calendarYear) => (
+              <option
+                className="bg-[#313030]"
+                key={calendarYear}
+                value={calendarYear}
+              >
+                {calendarYear}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="grid flex-1 grid-cols-7 content-start gap-y-1 text-center text-sm">
+        {weekdayLabels.map((day, index) => (
+          <span
+            key={`${day}-${index}`}
+            className="text-[10px] font-semibold tracking-[0.05em] text-[#c9c6c1]"
+          >
+            {day}
+          </span>
+        ))}
+        {Array.from({ length: firstWeekday }, (_, index) => (
+          <span key={`blank-${index}`} />
+        ))}
+        {Array.from({ length: daysInMonth }, (_, index) => {
+          const day = index + 1;
+          const key = dateKey(day);
+          const event = eventByDate.get(key);
+          const isSelected = key === selectedDate;
+          return (
+            <button
+              key={key}
+              onClick={() => {
+                setSelectedDate(key);
+                if (event) onOpenStation(event.workstationId);
+              }}
+              aria-pressed={isSelected}
+              aria-label={`${key}${event ? `: ${event.title}` : ""}`}
+              className="relative mx-auto grid size-7 place-items-center rounded-full text-xs transition-transform hover:scale-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <i
+                className={cn(
+                  "absolute inset-0 rounded-full",
+                  event?.type === "scheduled" && "border border-amber-400",
+                  event?.type === "completed" && "bg-amber-400",
+                  event?.type === "critical" && "bg-[#ba1a1a]",
+                  isSelected && !event && "bg-white/15",
+                  isSelected &&
+                    "ring-2 ring-white ring-offset-2 ring-offset-[#313030]",
+                )}
+              />
+              <b
+                className={cn(
+                  "relative text-xs",
+                  event?.type === "completed" && "text-black",
+                )}
+              >
+                {day}
+              </b>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex shrink-0 flex-wrap gap-3 border-t border-white/15 pt-2 text-[9px] font-semibold tracking-[0.05em] text-[#c9c6c1]">
+        <Legend color="border border-amber-400" label="Scheduled" small />
+        <Legend color="bg-amber-400" label="Maintenance Done" small />
+        <Legend color="bg-[#ba1a1a]" label="Critical" small />
+      </div>
     </section>
   );
 }
 
-function OeeCard({ workstations, overview }: { workstations: readonly Workstation[]; overview: unknown }) {
+function OeeCard({
+  workstations,
+  overview,
+}: {
+  workstations: readonly Workstation[];
+  overview: unknown;
+}) {
   const [target, setTarget] = useState(95);
   const [showTargetControl, setShowTargetControl] = useState(false);
   // The backend currently exposes capacity, but not the three raw OEE factors
   // (availability, performance, quality). Until those telemetry fields exist,
   // calculate and label this as a capacity-derived plant efficiency proxy.
-  const liveMetrics = (overview as { workstations?: Array<{ metrics?: { oeePercent: number } | null }> } | null)?.workstations?.map((station) => station.metrics?.oeePercent).filter((value): value is number => typeof value === "number") ?? [];
-  const oee = liveMetrics.length ? Math.round((liveMetrics.reduce((sum, value) => sum + value, 0) / liveMetrics.length) * 10) / 10 : 87.4;
+  const liveMetrics =
+    (
+      overview as {
+        workstations?: Array<{ metrics?: { oeePercent: number } | null }>;
+      } | null
+    )?.workstations
+      ?.map((station) => station.metrics?.oeePercent)
+      .filter((value): value is number => typeof value === "number") ?? [];
+  const oee = liveMetrics.length
+    ? Math.round(
+        (liveMetrics.reduce((sum, value) => sum + value, 0) /
+          liveMetrics.length) *
+          10,
+      ) / 10
+    : 87.4;
   const [targetReady, setTargetReady] = useState(false);
   useEffect(() => {
     const stored = window.localStorage.getItem("machine-overwatch:oee-target");
-    if (stored) { const value = Number(stored); if (Number.isFinite(value)) setTarget(Math.min(100, Math.max(80, value))); }
+    if (stored) {
+      const value = Number(stored);
+      if (Number.isFinite(value)) setTarget(Math.min(100, Math.max(80, value)));
+    }
     setTargetReady(true);
   }, []);
-  const updateTarget = (value: number) => { const next = Math.min(100, Math.max(80, value)); setTarget(next); window.localStorage.setItem("machine-overwatch:oee-target", String(next)); };
+  const updateTarget = (value: number) => {
+    const next = Math.min(100, Math.max(80, value));
+    setTarget(next);
+    window.localStorage.setItem("machine-overwatch:oee-target", String(next));
+  };
   const meetsTarget = oee >= target;
   const variance = Math.abs(oee - target).toFixed(1);
-  const ringColor = meetsTarget ? "#10b981" : target <= 90 ? "#f59e0b" : "#ba1a1a";
-  return <section className="relative col-span-12 flex h-full min-h-[400px] flex-col justify-between overflow-hidden rounded-[2rem] bg-white p-10 shadow-[0_20px_40px_rgba(0,0,0,0.02)] md:col-span-6 lg:col-span-4"><div><h3 className="text-xl font-semibold">Plant Efficiency (OEE proxy)</h3><p className="mt-2 text-sm text-[#46464a]">Calculated from live workstation capacity</p></div><div className="flex flex-1 items-center justify-center py-8"><div className="relative grid size-40 shrink-0 place-items-center rounded-full transition-colors" role="img" aria-label={`Calculated plant efficiency proxy is ${oee} percent, ${meetsTarget ? "meeting" : "below"} the ${target} percent target`} style={{ background: `conic-gradient(${ringColor} 0 ${oee}%, #e5e2e1 ${oee}% 100%)` }}><div className="grid size-[132px] place-items-center rounded-full bg-white px-2 text-center"><strong className="text-[32px] tracking-[-0.04em]">{oee}%</strong><span className="text-[11px] font-semibold tracking-[0.05em] text-[#46464a]">Target {target}%</span><span className={cn("text-[10px] font-bold", meetsTarget ? "text-emerald-600" : "text-[#ba1a1a]")}>{meetsTarget ? "On target" : `${variance}% below`}</span></div></div></div>{showTargetControl && <label className="absolute bottom-20 left-10 right-10 rounded-xl bg-[#f7f3f2] p-4 text-xs font-semibold text-[#46464a] shadow-sm">Target: {target}%<input aria-label="Plant efficiency target" value={target} onChange={(event) => updateTarget(Number(event.target.value))} type="range" min="80" max="100" step="0.5" className="mt-3 block w-full accent-black" /><span className="mt-1 flex justify-between text-[10px] font-normal"><span>80%</span><span>100%</span></span></label>}<button onClick={() => setShowTargetControl((current) => !current)} aria-expanded={showTargetControl} disabled={!targetReady} className="flex w-max items-center gap-2 text-xs font-bold tracking-[0.05em] transition-colors hover:text-[#77767b] disabled:opacity-50">Adjust Target <span className="grid size-7 place-items-center rounded-full bg-black text-white"><Pencil className="size-3" /></span></button></section>;
+  const ringColor = meetsTarget
+    ? "#10b981"
+    : target <= 90
+      ? "#f59e0b"
+      : "#ba1a1a";
+  return (
+    <section className="relative col-span-12 flex h-full min-h-[400px] flex-col justify-between overflow-hidden rounded-[2rem] bg-white p-10 shadow-[0_20px_40px_rgba(0,0,0,0.02)] md:col-span-6 lg:col-span-4">
+      <div>
+        <h3 className="text-xl font-semibold">Plant Efficiency (OEE proxy)</h3>
+        <p className="mt-2 text-sm text-[#46464a]">
+          Calculated from live workstation capacity
+        </p>
+      </div>
+      <div className="flex flex-1 items-center justify-center py-8">
+        <div
+          className="relative grid size-40 shrink-0 place-items-center rounded-full transition-colors"
+          role="img"
+          aria-label={`Calculated plant efficiency proxy is ${oee} percent, ${meetsTarget ? "meeting" : "below"} the ${target} percent target`}
+          style={{
+            background: `conic-gradient(${ringColor} 0 ${oee}%, #e5e2e1 ${oee}% 100%)`,
+          }}
+        >
+          <div className="grid size-[132px] place-items-center rounded-full bg-white px-2 text-center">
+            <strong className="inline-block translate-y-8 text-[32px] tracking-[-0.04em]">{oee}%</strong>
+            <span className="text-[8px] font-semibold tracking-[0.05em] text-[#46464a]">
+              Target {target}%
+            </span>
+            <span
+              className={cn(
+                "text-[10px] font-bold",
+                meetsTarget ? "text-emerald-600" : "text-[#ba1a1a]",
+              )}
+            >
+              {meetsTarget ? "On target" : `${variance}% below`}
+            </span>
+          </div>
+        </div>
+      </div>
+      {showTargetControl && (
+        <label className="absolute bottom-20 left-10 right-10 rounded-xl bg-[#f7f3f2] p-4 text-xs font-semibold text-[#46464a] shadow-sm">
+          Target: {target}%
+          <input
+            aria-label="Plant efficiency target"
+            value={target}
+            onChange={(event) => updateTarget(Number(event.target.value))}
+            type="range"
+            min="80"
+            max="100"
+            step="0.5"
+            className="mt-3 block w-full accent-black"
+          />
+          <span className="mt-1 flex justify-between text-[10px] font-normal">
+            <span>80%</span>
+            <span>100%</span>
+          </span>
+        </label>
+      )}
+      <button
+        onClick={() => setShowTargetControl((current) => !current)}
+        aria-expanded={showTargetControl}
+        disabled={!targetReady}
+        className="flex w-max items-center gap-2 text-xs font-bold tracking-[0.05em] transition-colors hover:text-[#77767b] disabled:opacity-50"
+      >
+        Adjust Target{" "}
+        <span className="grid size-7 place-items-center rounded-full bg-black text-white">
+          <Pencil className="size-3" />
+        </span>
+      </button>
+    </section>
+  );
 }
 
-function EnergyCard({ overview }: { overview: unknown }) { const quotaKwh = 500; const livePower = (overview as { workstations?: Array<{ metrics?: { powerKw: number } | null }> } | null)?.workstations?.map((station) => station.metrics?.powerKw).filter((value): value is number => typeof value === "number") ?? []; const consumptionKwh = livePower.length ? Math.round(livePower.reduce((sum, value) => sum + value, 0) * 10) / 10 : 342.8; const quotaPercent = Math.min(100, Math.round((consumptionKwh / quotaKwh) * 100)); return <section className="col-span-12 flex min-h-[325px] flex-col justify-between rounded-[2rem] bg-white p-8 shadow-[0_20px_40px_rgba(0,0,0,0.02)] md:col-span-6 lg:col-span-4"><div><div className="flex items-end justify-between gap-4"><h3 className="text-xl font-semibold">Energy Consumption</h3><strong className="text-xl">{consumptionKwh} <span className="text-sm font-normal text-[#46464a]">kWh/h</span></strong></div><p className="mt-1 text-sm text-[#46464a]">{quotaPercent}% of controlled hourly quota</p></div><div className="my-auto py-8"><div className="h-3 overflow-hidden rounded-full bg-[#e5e2e1]"><div className="h-full rounded-full bg-black transition-[width] duration-500" style={{ width: `${quotaPercent}%` }} /></div><div className="mt-2 flex justify-between text-xs font-semibold tracking-[0.05em] text-[#46464a]"><span>0 kWh/h</span><span>{quotaKwh} kWh/h</span></div></div></section>; }
+function EnergyCard({ overview }: { overview: unknown }) {
+  const quotaKwh = 500;
+  const livePower =
+    (
+      overview as {
+        workstations?: Array<{ metrics?: { powerKw: number } | null }>;
+      } | null
+    )?.workstations
+      ?.map((station) => station.metrics?.powerKw)
+      .filter((value): value is number => typeof value === "number") ?? [];
+  const consumptionKwh = livePower.length
+    ? Math.round(livePower.reduce((sum, value) => sum + value, 0) * 10) / 10
+    : 342.8;
+  const quotaPercent = Math.min(
+    100,
+    Math.round((consumptionKwh / quotaKwh) * 100),
+  );
+  return (
+    <section className="col-span-12 flex min-h-[325px] flex-col justify-between rounded-[2rem] bg-white p-8 shadow-[0_20px_40px_rgba(0,0,0,0.02)] md:col-span-6 lg:col-span-4">
+      <div>
+        <div className="flex items-end justify-between gap-4">
+          <h3 className="text-xl font-semibold">Energy Consumption</h3>
+          <strong className="text-xl">
+            {consumptionKwh}{" "}
+            <span className="text-sm font-normal text-[#46464a]">kWh/h</span>
+          </strong>
+        </div>
+        <p className="mt-1 text-sm text-[#46464a]">
+          {quotaPercent}% of controlled hourly quota
+        </p>
+      </div>
+      <div className="my-auto py-8">
+        <div className="h-3 overflow-hidden rounded-full bg-[#e5e2e1]">
+          <div
+            className="h-full rounded-full bg-black transition-[width] duration-500"
+            style={{ width: `${quotaPercent}%` }}
+          />
+        </div>
+        <div className="mt-2 flex justify-between text-xs font-semibold tracking-[0.05em] text-[#46464a]">
+          <span>0 kWh/h</span>
+          <span>{quotaKwh} kWh/h</span>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-function MonitoredStations({ workstations, selectedId, onOpenStation }: { workstations: readonly Workstation[]; selectedId: string; onOpenStation: (id: string) => void }) { return <section className="col-span-12 flex min-h-[325px] flex-col rounded-[2rem] bg-white p-8 shadow-[0_20px_40px_rgba(0,0,0,0.02)] lg:col-span-4"><div className="mb-6 flex items-center justify-between gap-3"><h3 className="text-xl font-semibold">Monitored Workstations</h3><button className="flex items-center gap-1 text-xs font-semibold tracking-[0.05em] transition-colors hover:text-[#77767b]">Add Sensor <span className="grid size-5 place-items-center rounded-full bg-black text-white"><Plus className="size-3" /></span></button></div><div className="flex flex-1 flex-col gap-3">{workstations.map((station) => <button key={station.id} onClick={() => onOpenStation(station.id)} className={cn("flex items-center justify-between rounded-xl bg-[#f7f3f2] p-3 text-left transition-colors hover:bg-[#e5e2e1]", station.id === selectedId && "ring-2 ring-black/15")}><span className="flex min-w-0 items-center gap-3"><StationIcon id={station.id} /><span className="min-w-0"><b className="block truncate text-sm">{station.id} {station.name}</b><small className="block truncate text-[10px] font-semibold tracking-[0.05em] text-[#46464a]">{station.predictedComponent}</small></span></span><i className={cn("size-3 shrink-0 rounded-full", station.status === "At Risk" ? "bg-[#ba1a1a]" : "bg-[#c7c6ca]")} /></button>)}</div></section>; }
+function MonitoredStations({
+  workstations,
+  selectedId,
+  onOpenStation,
+}: {
+  workstations: readonly Workstation[];
+  selectedId: string;
+  onOpenStation: (id: string) => void;
+}) {
+  return (
+    <section className="col-span-12 flex min-h-[325px] flex-col rounded-[2rem] bg-white p-8 shadow-[0_20px_40px_rgba(0,0,0,0.02)] lg:col-span-4">
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h3 className="text-xl font-semibold">Monitored Workstations</h3>
+        <button className="flex items-center gap-1 text-xs font-semibold tracking-[0.05em] transition-colors hover:text-[#77767b]">
+          Add Sensor{" "}
+          <span className="grid size-5 place-items-center rounded-full bg-black text-white">
+            <Plus className="size-3" />
+          </span>
+        </button>
+      </div>
+      <div className="flex flex-1 flex-col gap-3">
+        {workstations.map((station) => (
+          <button
+            key={station.id}
+            onClick={() => onOpenStation(station.id)}
+            className={cn(
+              "flex items-center justify-between rounded-xl bg-[#f7f3f2] p-3 text-left transition-colors hover:bg-[#e5e2e1]",
+              station.id === selectedId && "ring-2 ring-black/15",
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <StationIcon id={station.id} />
+              <span className="min-w-0">
+                <b className="block truncate text-sm">
+                  {station.id} {station.name}
+                </b>
+                <small className="block truncate text-[10px] font-semibold tracking-[0.05em] text-[#46464a]">
+                  {station.predictedComponent}
+                </small>
+              </span>
+            </span>
+            <i
+              className={cn(
+                "size-3 shrink-0 rounded-full",
+                station.status === "At Risk" ? "bg-[#ba1a1a]" : "bg-[#c7c6ca]",
+              )}
+            />
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
 
-function TelemetryDrawer({ open, station, onClose, onSchedule, onThrottle }: { open: boolean; station: Workstation; onClose: () => void; onSchedule: (station: Workstation) => void; onThrottle: (station: Workstation) => void }) { const [actionMessage, setActionMessage] = useState(""); const highRisk = station.failureProb >= 80 || station.health === "Critical"; const telemetry = [["Temperature", `${station.temperature.toFixed(1)} C${station.temperature >= 75 ? " (High)" : ""}`], ["Vibration", `${station.vibration.toFixed(1)} mm/s${station.vibration >= 3 ? " (High)" : ""}`], ["Motor current", `${station.motorCurrent.toFixed(1)} A`]]; return <aside aria-hidden={!open} className={cn("fixed inset-y-0 right-0 z-50 flex w-full max-w-[400px] flex-col bg-white shadow-2xl transition-transform duration-300", open ? "translate-x-0" : "translate-x-full")}><div className="flex items-center justify-between border-b border-black/10 p-6"><div><h3 className="text-xl font-semibold">{station.id} Telemetry</h3><p className="mt-1 text-xs text-[#66636a]">{station.name}</p></div><button onClick={onClose} className="rounded-full p-2 text-xl hover:bg-[#f7f3f2]" aria-label="Close telemetry panel">x</button></div><div className="flex-1 space-y-6 overflow-y-auto p-6"><div><h4 className="mb-2 text-xs font-semibold tracking-[0.05em] text-[#46464a]">Current Status</h4><div className={cn("rounded-xl p-4 font-bold", highRisk ? "bg-[#ffdad6] text-[#93000a]" : "bg-[#e5e2e1] text-[#313030]")}>{station.status.toUpperCase()}: {station.predictedComponent}</div><p className="mt-2 text-xs text-[#66636a]">Failure probability {station.failureProb}% - estimated time to failure {station.estimatedTTF}.</p></div><div><h4 className="mb-2 text-xs font-semibold tracking-[0.05em] text-[#46464a]">Live Telemetry</h4><div className="space-y-3">{telemetry.map(([label, value], index) => <div key={label} className="flex items-center justify-between rounded-xl bg-[#f7f3f2] p-3"><span>{label}</span><strong className={index < 2 && (station.temperature >= 75 || station.vibration >= 3) ? "text-[#ba1a1a]" : ""}>{value}</strong></div>)}</div></div><div><h4 className="mb-2 text-xs font-semibold tracking-[0.05em] text-[#46464a]">Recommended Actions</h4><button onClick={() => { onSchedule(station); setActionMessage(`Maintenance planning started for ${station.id}.`); }} className="mb-2 w-full rounded-xl bg-black py-3 text-sm font-bold text-white hover:bg-[#313030]">{highRisk ? "Schedule Emergency Maintenance" : "Schedule Maintenance"}</button><button onClick={() => { onThrottle(station); setActionMessage(`Production throttle applied to ${station.id}.`); }} className="w-full rounded-xl border border-[#77767b] py-3 text-sm font-bold hover:bg-[#f7f3f2]">Throttle Production Rate</button>{actionMessage && <p role="status" className="mt-3 rounded-xl bg-[#f7f3f2] p-3 text-xs font-semibold text-[#46464a]">{actionMessage}</p>}</div></div></aside>; }
+function TelemetryDrawer({
+  open,
+  station,
+  onClose,
+  onSchedule,
+  onThrottle,
+}: {
+  open: boolean;
+  station: Workstation;
+  onClose: () => void;
+  onSchedule: (station: Workstation) => void;
+  onThrottle: (station: Workstation) => void;
+}) {
+  const [actionMessage, setActionMessage] = useState("");
+  const highRisk = station.failureProb >= 80 || station.health === "Critical";
+  const telemetry = [
+    [
+      "Temperature",
+      `${station.temperature.toFixed(1)} C${station.temperature >= 75 ? " (High)" : ""}`,
+    ],
+    [
+      "Vibration",
+      `${station.vibration.toFixed(1)} mm/s${station.vibration >= 3 ? " (High)" : ""}`,
+    ],
+    ["Motor current", `${station.motorCurrent.toFixed(1)} A`],
+  ];
+  return (
+    <aside
+      aria-hidden={!open}
+      className={cn(
+        "fixed inset-y-0 right-0 z-50 flex w-full max-w-[400px] flex-col bg-white shadow-2xl transition-transform duration-300",
+        open ? "translate-x-0" : "translate-x-full",
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-black/10 p-6">
+        <div>
+          <h3 className="text-xl font-semibold">{station.id} Telemetry</h3>
+          <p className="mt-1 text-xs text-[#66636a]">{station.name}</p>
+        </div>
+        <button
+          onClick={onClose}
+          className="rounded-full p-2 text-xl hover:bg-[#f7f3f2]"
+          aria-label="Close telemetry panel"
+        >
+          x
+        </button>
+      </div>
+      <div className="flex-1 space-y-6 overflow-y-auto p-6">
+        <div>
+          <h4 className="mb-2 text-xs font-semibold tracking-[0.05em] text-[#46464a]">
+            Current Status
+          </h4>
+          <div
+            className={cn(
+              "rounded-xl p-4 font-bold",
+              highRisk
+                ? "bg-[#ffdad6] text-[#93000a]"
+                : "bg-[#e5e2e1] text-[#313030]",
+            )}
+          >
+            {station.status.toUpperCase()}: {station.predictedComponent}
+          </div>
+          <p className="mt-2 text-xs text-[#66636a]">
+            Failure probability {station.failureProb}% - estimated time to
+            failure {station.estimatedTTF}.
+          </p>
+        </div>
+        <div>
+          <h4 className="mb-2 text-xs font-semibold tracking-[0.05em] text-[#46464a]">
+            Live Telemetry
+          </h4>
+          <div className="space-y-3">
+            {telemetry.map(([label, value], index) => (
+              <div
+                key={label}
+                className="flex items-center justify-between rounded-xl bg-[#f7f3f2] p-3"
+              >
+                <span>{label}</span>
+                <strong
+                  className={
+                    index < 2 &&
+                    (station.temperature >= 75 || station.vibration >= 3)
+                      ? "text-[#ba1a1a]"
+                      : ""
+                  }
+                >
+                  {value}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="mb-2 text-xs font-semibold tracking-[0.05em] text-[#46464a]">
+            Recommended Actions
+          </h4>
+          <button
+            onClick={() => {
+              onSchedule(station);
+              setActionMessage(
+                `Maintenance planning started for ${station.id}.`,
+              );
+            }}
+            className="mb-2 w-full rounded-xl bg-black py-3 text-sm font-bold text-white hover:bg-[#313030]"
+          >
+            {highRisk
+              ? "Schedule Emergency Maintenance"
+              : "Schedule Maintenance"}
+          </button>
+          <button
+            onClick={() => {
+              onThrottle(station);
+              setActionMessage(`Production throttle applied to ${station.id}.`);
+            }}
+            className="w-full rounded-xl border border-[#77767b] py-3 text-sm font-bold hover:bg-[#f7f3f2]"
+          >
+            Throttle Production Rate
+          </button>
+          {actionMessage && (
+            <p
+              role="status"
+              className="mt-3 rounded-xl bg-[#f7f3f2] p-3 text-xs font-semibold text-[#46464a]"
+            >
+              {actionMessage}
+            </p>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
 
-function StatusPill({ critical, warning, status }: { critical: boolean; warning: boolean; status: string }) { return <span className={cn("rounded-md px-2 py-1 text-xs font-bold", critical ? "bg-[#ba1a1a] text-white" : warning ? "bg-amber-400/20 text-amber-700" : "bg-[#313030] text-[#f4f0ef]")}>{critical ? "Critical" : warning ? "Warning" : status === "Under Maintenance" ? "Maintenance" : "Normal"}</span>; }
-function StationIcon({ id }: { id: string }) { const Icon = id === "WS-108" ? Bot : id === "WS-205" ? Package : Factory; return <span className="grid size-8 place-items-center rounded-full bg-[#e5e2e1] text-[#46464a]"><Icon className="size-4" /></span>; }
-function Legend({ color, label, small = false }: { color: string; label: string; small?: boolean }) { return <span className="flex items-center gap-3"><i className={cn("rounded-full", small ? "size-2" : "h-1 w-6", color)} />{label}</span>; }
+function StatusPill({
+  critical,
+  warning,
+  status,
+}: {
+  critical: boolean;
+  warning: boolean;
+  status: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "rounded-md px-2 py-1 text-xs font-bold",
+        critical
+          ? "bg-[#ba1a1a] text-white"
+          : warning
+            ? "bg-amber-400/20 text-amber-700"
+            : "bg-[#313030] text-[#f4f0ef]",
+      )}
+    >
+      {critical
+        ? "Critical"
+        : warning
+          ? "Warning"
+          : status === "Under Maintenance"
+            ? "Maintenance"
+            : "Normal"}
+    </span>
+  );
+}
+function StationIcon({ id }: { id: string }) {
+  const Icon = id === "WS-108" ? Bot : id === "WS-205" ? Package : Factory;
+  return (
+    <span className="grid size-8 place-items-center rounded-full bg-[#e5e2e1] text-[#46464a]">
+      <Icon className="size-4" />
+    </span>
+  );
+}
+function Legend({
+  color,
+  label,
+  small = false,
+}: {
+  color: string;
+  label: string;
+  small?: boolean;
+}) {
+  return (
+    <span className="flex items-center gap-3">
+      <i className={cn("rounded-full", small ? "size-2" : "h-1 w-6", color)} />
+      {label}
+    </span>
+  );
+}
 
 function RecoverySuccessBanner() {
   const { activeCase } = useOperations();
-  const recovered = activeCase?.failureCase?.workflowState?.toLowerCase().includes("recovered");
+  const recovered = activeCase?.failureCase?.workflowState
+    ?.toLowerCase()
+    .includes("recovered");
   if (!recovered) return null;
 
   return (
@@ -207,24 +955,36 @@ function RecoverySuccessBanner() {
               <span className="rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-[10px] font-bold tracking-wider text-emerald-300">
                 CLOSED-LOOP RECOVERY VERIFIED
               </span>
-              <span className="text-xs text-white/50">WS-102 · Servo Bearing Recovery</span>
+              <span className="text-xs text-white/50">
+                WS-102 · Servo Bearing Recovery
+              </span>
             </div>
             <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">
               Workstation Restored to Full Operational Capacity
             </h2>
             <p className="mt-1 text-sm text-white/70">
-              Work order WO-WS102-081 passed return-to-service validation. Allocation lock released, schedule normalized, and customer deliveries secured.
+              Work order WO-WS102-081 passed return-to-service validation.
+              Allocation lock released, schedule normalized, and customer
+              deliveries secured.
             </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-white/50">Workstation</p>
-            <p className="font-mono text-sm font-bold text-emerald-300">WS-102: OPERATIONAL</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/50">
+              Workstation
+            </p>
+            <p className="font-mono text-sm font-bold text-emerald-300">
+              WS-102: OPERATIONAL
+            </p>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-center">
-            <p className="text-[10px] uppercase tracking-wider text-white/50">Lock State</p>
-            <p className="font-mono text-sm font-bold text-emerald-300">RELEASED</p>
+            <p className="text-[10px] uppercase tracking-wider text-white/50">
+              Lock State
+            </p>
+            <p className="font-mono text-sm font-bold text-emerald-300">
+              RELEASED
+            </p>
           </div>
         </div>
       </div>

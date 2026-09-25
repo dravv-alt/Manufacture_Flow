@@ -14,18 +14,19 @@ import { cn } from "@/lib/utils";
 type RequestState = keyof typeof demoProcurementStates;
 
 export function ProcurementControl() {
-  const { state: operationsState, activeCase, runWorkflowCommand, pendingCommand } = useOperations();
+  const { state: operationsState, activeCase, runWorkflowCommand, pendingCommand, commandError, clearCommandError } = useOperations();
   const state = operationsState.procurementState;
   const persistedRequest = activeCase?.procurementRequests[0];
   const workOrder = activeCase?.maintenanceWorkOrders[0];
   const vendorNotification = activeCase?.vendorNotifications[0];
+  const received = activeCase?.events.some(event => event.eventType === "receive_part") ?? false;
 
   const fallbackRequest = {
     id: "PR-2026-0884",
     partId: "BRG-10023",
     partName: "Deep Groove Spindle Ball Bearing (SKF 6205-2RSH)",
     quantity: 1,
-    requiredBy: "Today, 18:30 IST",
+    requiredBy: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleString(),
     linkedCase: activeCase?.failureCase.externalId ?? "FC-2026-0047",
     workOrderId: workOrder?.externalId ?? "WO-WS102-081",
     vendor: "Apex Motion Components / Pune Hub",
@@ -55,17 +56,19 @@ export function ProcurementControl() {
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
         <section className="flex flex-col gap-5 border-b border-border pb-7">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-emerald-600 dark:text-emerald-400"><span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />ERP REQUISITIONS LINKED</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold text-amber-700"><span className="size-1.5 rounded-full bg-amber-500" />SIMULATED REQUISITION</span>
             <span className="font-mono text-xs text-muted-foreground">PROCUREMENT CONTROL / {request.id}</span>
           </div>
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div className="max-w-3xl">
               <h1 className="font-heading text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Make the replenishment handoff auditable.</h1>
-              <p className="mt-3 text-base leading-7 text-muted-foreground">Automated purchase requisition dispatched directly via SAP ERP Integration Gateway with expedited courier routing.</p>
+              <p className="mt-3 text-base leading-7 text-muted-foreground">Simulate a reviewable purchase request, vendor acknowledgement, delay, and warehouse receipt. No external ERP request or email is sent.</p>
             </div>
             <Badge variant={current.badge}>{current.label}</Badge>
           </div>
         </section>
+
+        {commandError ? <div role="alert" className="flex items-center justify-between gap-3 rounded-md border border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive"><span>{commandError}</span><button className="underline" onClick={clearCommandError}>Dismiss</button></div> : null}
 
         <OperationalPath
           title="Procurement to recovery"
@@ -117,15 +120,14 @@ export function ProcurementControl() {
           <CardContent className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {(["draft", "sent", "acknowledged", "delayed"] as RequestState[]).map((item) => (
-                <button
+                <div
                   key={item}
-                  disabled={pendingCommand === "set_procurement_state"}
-                  onClick={() => setState(item)}
-                  className={cn("rounded-md border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60", state === item ? "border-primary bg-primary text-primary-foreground" : "border-border hover:bg-muted")}
+                  aria-current={state === item ? "step" : undefined}
+                  className={cn("rounded-md border p-4 text-left", state === item ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/30")}
                 >
                   <span className="font-mono text-xs">{stateCopy[item].label}</span>
                   <span className="mt-2 block text-sm">{stateCopy[item].detail}</span>
-                </button>
+                </div>
               ))}
             </div>
             <div className="flex flex-wrap gap-3">
@@ -139,14 +141,9 @@ export function ProcurementControl() {
                   <Check data-icon="inline-start" />Record acknowledgement
                 </Button>
               ) : null}
-              {state === "acknowledged" ? (
-                <Button variant="outline" disabled={pendingCommand === "set_procurement_state"} onClick={() => setState("delayed")}>
-                  <Clock3 data-icon="inline-start" />Record delay
-                </Button>
-              ) : null}
-              <Button variant="outline" disabled={pendingCommand === "set_procurement_state"} onClick={() => setState("draft")}>
-                <Mail data-icon="inline-start" />Return to editable draft
-              </Button>
+              {state === "acknowledged" ? <><Button disabled={received || pendingCommand === "receive_part"} onClick={() => void runWorkflowCommand({ type: "receive_part" })}><Truck data-icon="inline-start" />{received ? "Stock received" : "Receive into warehouse"}</Button><Button variant="outline" disabled={pendingCommand === "set_procurement_state"} onClick={() => setState("delayed")}><Clock3 data-icon="inline-start" />Record delay</Button></> : null}
+              {(state === "sent" || state === "delayed") ? <Button variant="outline" disabled={pendingCommand === "set_procurement_state"} onClick={() => setState("draft")}><Mail data-icon="inline-start" />Return to editable draft</Button> : null}
+              {received ? <Button asChild variant="outline"><Link href="/warehouse">View updated warehouse stock</Link></Button> : null}
             </div>
             <p className="font-mono text-xs text-muted-foreground">Recipients: Procurement Team / Maintenance Lead / Production Scheduler · external financial approval not configured</p>
           </CardContent>
@@ -262,7 +259,7 @@ function ProcurementCoordinationDesk({ vendor }: { vendor: string }) {
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
               <h2 className="font-heading text-2xl font-semibold tracking-tight text-white">Vendor Communications</h2>
             </div>
-            <p className="mt-1 text-sm text-white/60">Live encrypted procurement channel · Replenishment coordination desk</p>
+            <p className="mt-1 text-sm text-white/60">Internal demo thread · No external messages are delivered</p>
           </div>
           <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/[0.08] px-4 py-1.5 backdrop-blur-xl shadow-inner">
             <span className="size-1.5 rounded-full bg-emerald-400" />

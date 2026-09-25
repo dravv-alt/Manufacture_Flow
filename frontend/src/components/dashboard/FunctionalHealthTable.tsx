@@ -25,7 +25,7 @@ export function FunctionalHealthTable({ workstations, onOpenStation }: { worksta
     const cycleTime = m?.cycleTimeSeconds ?? (38.0 + (charCode % 12));
     const output = m?.outputPerHour ?? Math.round(3600 / (38.0 + (charCode % 12)));
     const defect = m?.defectRatePercent ?? (station.status === "At Risk" ? 1.85 : 0.14);
-    const lastMaint = m ? new Date(m.lastMaintenanceAt).toLocaleDateString() : (station.lastMaintenance || "12-May 2026");
+    const lastMaint = m ? new Date(m.lastMaintenanceAt).toLocaleDateString() : (station.lastMaintenance || "Not recorded");
     const nextMaint = m ? new Date(m.nextMaintenanceAt).toLocaleDateString() : (station.status === "At Risk" ? "Immediate (WO-WS102-081)" : "15-Sep 2026");
     const rul = m?.estimatedRulDays ?? (station.rul ? parseInt(station.rul) : 48);
     const operator = m?.operatorId ?? `OP-4${String(charCode * 3 % 90 + 10).padStart(2, "0")}`;

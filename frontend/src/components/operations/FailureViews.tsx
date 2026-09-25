@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { AlertTriangle, ArrowRight, Check, RefreshCw, Route, SlidersHorizontal, Wrench } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CircuitBoard } from "@/components/twin/CircuitBoard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useOperations } from "@/contexts/OperationsContext";
 import { cn } from "@/lib/utils";
-import { apiFetch } from "@/lib/api-client";
 
 
 export function FailureIndex() {
@@ -23,10 +22,18 @@ export function FailureIndex() {
 
 export function FailureCaseDetail({ caseId }: { caseId: string }) {
   const { state, data, update } = useOperations();
-  const failure = data.failures.find((item) => item.id === caseId) ?? data.failures[0];
+  const failure = data.failures.find((item) => item.id === caseId);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const telemetryUnavailable = state.condition === "failed" || state.condition === "stale";
   const rerouteApproved = state.routingApproved;
+  if (!failure) {
+    const message = state.condition === "loading"
+      ? "Loading the requested failure case..."
+      : state.condition === "empty"
+        ? "No simulated incident is currently active. Reset the demo from Story / Demo Mode."
+        : "This failure case does not exist, is no longer active, or is unavailable to your session.";
+    return <main className="min-h-screen bg-background px-5 py-8 text-[#1c1b1b] lg:px-8"><div className="mx-auto max-w-2xl rounded-[2rem] border border-[#ddd6ce] bg-white p-8 shadow-[0_22px_40px_rgba(0,0,0,0.035)]"><p className="text-xs font-semibold tracking-[0.06em] text-[#5d595d]">FAILURE CASE UNAVAILABLE</p><h1 className="mt-3 text-3xl font-semibold">No incident is available for {caseId}.</h1><p className="mt-3 text-[#625e61]">{message}</p><Button asChild className="mt-6"><Link href="/failure">Return to failure cases</Link></Button></div></main>;
+  }
   const events = [
     { label: "Anomaly detected", detail: "Vibration signature exceeded the X-axis servo threshold.", time: "03:14 IST", complete: true },
     { label: "Automated diagnostics", detail: "Predictive model confirms imminent bearing failure.", time: "03:15 IST", complete: true },
@@ -51,7 +58,7 @@ export function FailureCaseDetail({ caseId }: { caseId: string }) {
         <div className="mt-8 grid gap-4 sm:grid-cols-3"><ImpactCard label="Affected jobs" value="3" detail="J1001-J1003" /><ImpactCard label="Throughput drop" value="-12%" detail="Est. 4h duration" tone="danger" /><ImpactCard label="Reroute option" value="WS-105" detail="75% capacity" tone="success" /></div>
         <RerouteMap approved={rerouteApproved} />
         {showDiagnostics && <div className="mt-5 rounded-2xl border border-[#ddd6ce] bg-[#f6f3ef] p-4 text-sm text-[#615d60]"><strong className="text-[#1c1b1b]">Scenario parameters</strong><p className="mt-1">Dynamic heuristic re-indexer active: Workstation WS-102 scheduled for emergency isolation. High-priority batches J1001-J1003 rerouted to standby 5-axis cell WS-105 (available capacity: 75%).</p></div>}
-        <div className="mt-7 border-t border-[#ded8d1] pt-5"><h3 className="font-semibold">Required Actions</h3><div className="mt-4 grid gap-3 sm:grid-cols-2"><button onClick={() => update({ routingApproved: true, routingOutcome: "approved", rerouteTargetId: "WS-105" })} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#303030]"><Route className="size-4" />{rerouteApproved ? "Reroute Approved for WS-105" : "Initiate Reroute to WS-105"}</button><button onClick={() => update({ maintenanceStage: Math.max(state.maintenanceStage, 2) })} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border-2 border-[#747174] bg-white px-5 text-sm font-bold transition-colors hover:bg-[#f5f2ee]"><Wrench className="size-4" />Confirm Maintenance</button></div></div>
+        <div className="mt-7 border-t border-[#ded8d1] pt-5"><h3 className="font-semibold">Required Actions</h3><div className="mt-4 grid gap-3 sm:grid-cols-2"><Link href="/rerouting" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-black px-5 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#303030]"><Route className="size-4" />{rerouteApproved ? "Continue Approved Reroute" : "Review Rerouting Plan"}</Link><Link href="/maintenance" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full border-2 border-[#747174] bg-white px-5 text-sm font-bold transition-colors hover:bg-[#f5f2ee]"><Wrench className="size-4" />Open Maintenance Work Order</Link></div></div>
       </section>
     </section>
   </div></main>;
@@ -71,25 +78,9 @@ function MetricValue({ label, value, suffix, large = false }: { label: string; v
 function ImpactCard({ label, value, detail, tone = "default" }: { label: string; value: string; detail: string; tone?: "default" | "danger" | "success" }) { return <div className="rounded-[1.65rem] border border-[#ddd6ce] bg-[#f5f2ef] p-5"><p className="text-xs font-semibold uppercase tracking-[0.06em] text-[#5d595d]">{label}</p><p className={cn("mt-4 text-[30px] font-semibold tracking-[-0.02em]", tone === "danger" && "text-[#ba1a1a]", tone === "success" && "text-emerald-700")}>{value}</p><p className={cn("mt-1 text-sm", tone === "danger" ? "text-[#ba1a1a]" : tone === "success" ? "text-emerald-700" : "text-[#615d60]")}>{detail}</p></div>; }
 function StatusLine({ label, value, success = false }: { label: string; value: string; success?: boolean }) { return <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-[#504c4f]"><i className={cn("size-2 rounded-full", success ? "bg-emerald-700" : "bg-amber-400")} />{label}</span><strong className={success ? "text-emerald-700" : "text-amber-600"}>{value}</strong></div>; }
 function TelemetryDiagnostic({ retry }: { retry: () => void }) { return <section className="mb-6 rounded-[1.5rem] border border-[#ba1a1a]/30 bg-white p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="flex items-center gap-2 font-semibold text-[#93000a]"><AlertTriangle className="size-4" />Telemetry feed unavailable</p><p className="mt-1 text-sm text-[#625e61]">This controlled demo is showing a recoverable stale-data state.</p></div><button onClick={retry} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#777276] px-4 text-sm font-semibold hover:bg-[#f5f2ee]"><RefreshCw className="size-4" />Retry demo feed</button></div></section>; }
-function AuditTrail({ caseId }: { caseId: string }) {
-  const [events, setEvents] = useState<Array<{ id: string; eventType: string; actor: string; occurredAt: string }>>([]);
-  useEffect(() => {
-    void apiFetch(`/api/failure-cases/${caseId}/audit-events`)
-      .then(async (response) => (response.ok ? (response.json() as Promise<{ events: Array<{ id: string; eventType: string; actor: string; occurredAt: string }> }>) : null))
-      .then((payload) => {
-        if (payload && payload.events?.length) setEvents(payload.events);
-      })
-      .catch(() => undefined);
-  }, [caseId]);
-
-  const fallbackEvents = [
-    { id: "EVT-01", eventType: "ANOMALY_TRIGGER_INGESTED", actor: "Edge IIoT Node #04 (WS-102)", occurredAt: new Date(Date.now() - 48 * 60000).toISOString() },
-    { id: "EVT-02", eventType: "PREDICTIVE_FAILURE_TRIAGE", actor: "Machine Learning Model v3.2.1", occurredAt: new Date(Date.now() - 44 * 60000).toISOString() },
-    { id: "EVT-03", eventType: "WORK_ORDER_PROVISIONED", actor: "Automated Dispatch Service", occurredAt: new Date(Date.now() - 30 * 60000).toISOString() },
-    { id: "EVT-04", eventType: "PRODUCTION_REROUTE_OPTIMIZED", actor: "Line Operations Optimizer", occurredAt: new Date(Date.now() - 15 * 60000).toISOString() },
-  ];
-
-  const displayEvents = events.length ? events : fallbackEvents;
+function AuditTrail({ caseId: _caseId }: { caseId: string }) {
+  const { activeCase } = useOperations();
+  const displayEvents = activeCase?.events ?? [];
 
   return (
     <section className="rounded-[2rem] border border-[#ddd6ce] bg-white p-7 shadow-[0_22px_40px_rgba(0,0,0,0.035)]">
@@ -107,6 +98,7 @@ function AuditTrail({ caseId }: { caseId: string }) {
             <time className="shrink-0 text-xs text-[#615d60]">{new Date(event.occurredAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} IST</time>
           </div>
         ))}
+        {displayEvents.length === 0 ? <p className="rounded-xl bg-[#f5f2ef] p-4 text-sm text-[#615d60]">No workflow actions have been recorded for this case.</p> : null}
       </div>
     </section>
   );

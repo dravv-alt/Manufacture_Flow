@@ -26,8 +26,14 @@ export function NotificationsControl() {
   }));
 
   const notices = useMemo<DemoNotification[]>(() => {
-    if (backendNotices && backendNotices.length > 0) return backendNotices;
-    return [...demoNotifications];
+    const source = backendNotices ?? [...demoNotifications];
+    const seen = new Set<string>();
+    return source.filter((notice) => {
+      const key = notice.title.trim().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 8);
   }, [backendNotices]);
 
   const defaultAttempts: NotificationAttempt[] = [
@@ -36,7 +42,7 @@ export function NotificationsControl() {
     { id: "ATT-03", notificationId: "NT-102", attemptNumber: 1, state: "unread", actor: "Edge Inference Telemetry Agent", detail: "Alert dispatched to Production Lead & Supervisor channels", occurredAt: new Date(Date.now() - 10800000).toISOString() },
   ];
 
-  const attempts: NotificationAttempt[] = (activeCase?.notificationAttempts && activeCase.notificationAttempts.length > 0) ? activeCase.notificationAttempts : defaultAttempts;
+  const attempts: NotificationAttempt[] = activeCase ? activeCase.notificationAttempts : defaultAttempts;
 
   const visible = useMemo(() => filter === "all" ? notices : notices.filter((notice) => notice.status === filter), [filter, notices]);
 
@@ -82,22 +88,21 @@ export function NotificationsControl() {
             {visible.map((notice) => {
               const history = attempts.filter((attempt) => attempt.notificationId === notice.id);
               return (
-                <article key={notice.id} className={cn("flex flex-col gap-4 rounded-xl border p-4", notice.status === "failed" ? "border-destructive" : "border-border")}>
-                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div className="flex gap-3">
+                <article key={notice.id} className={cn("grid gap-4 rounded-xl border p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start", notice.status === "failed" ? "border-destructive bg-destructive/[0.02]" : "border-border")}>
+                    <div className="flex min-w-0 gap-3">
                       <span className={cn("mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full", notice.status === "failed" ? "bg-destructive text-primary-foreground" : notice.status === "unread" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
                         {notice.status === "failed" ? <MailWarning className="size-4" /> : notice.status === "acknowledged" ? <Check className="size-4" /> : <CircleAlert className="size-4" />}
                       </span>
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="text-sm font-semibold">{notice.title}</p>
+                          <p className="break-words text-sm font-semibold leading-5">{notice.title}</p>
                           <Badge variant={notice.status === "failed" ? "destructive" : notice.status === "unread" ? "outline" : "secondary"}>{notice.status}</Badge>
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">{notice.detail}</p>
                         <p className="mt-2 font-mono text-[10px] text-muted-foreground">{notice.id}</p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 md:justify-end">
                       <Button asChild variant="outline" size="sm"><Link href={notice.href}>Open record</Link></Button>
                       {notice.status === "failed" ? (
                         <Button size="sm" disabled={pendingCommand === "retry_notification"} onClick={() => update(notice, "unread")}>
@@ -109,7 +114,6 @@ export function NotificationsControl() {
                         </Button>
                       ) : null}
                     </div>
-                  </div>
                   {history.length ? (
                     <div className="border-t border-border pt-3">
                       <p className="font-mono text-[10px] font-semibold tracking-wide text-muted-foreground">DELIVERY HISTORY</p>

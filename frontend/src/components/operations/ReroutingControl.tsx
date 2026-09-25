@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, ChevronDown, Factory, Gauge, Route, ShieldCheck, TriangleAlert } from "lucide-react";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { OperationalPath } from "@/components/operations/OperationalPath";
 import { demoReroutingAlternatives, demoReroutingJobs } from "@/demo-data/ws102-scenario";
@@ -10,11 +9,22 @@ import { cn } from "@/lib/utils";
 
 export function ReroutingControl() {
   const { state, update, runWorkflowCommand, pendingCommand, commandError, clearCommandError, activeCase } = useOperations();
-  const [expandedJob, setExpandedJob] = useState("J1001");
+  const expandedJob = state.expandedRerouteJobId;
+  const reviewedJobIds = state.reviewedRerouteJobIds;
+  const reviewed = activeCase?.productionJobs.every(job => reviewedJobIds.includes(job.externalId)) ?? false;
+  const confirmed = activeCase?.events.some(event => event.eventType === "confirm_reroute") ?? false;
   const selected = state.rerouteTargetId || "WS-105";
-  const approved = state.routingApproved;
-  const selectTarget = (target: string) => update({ rerouteTargetId: target, routingApproved: false, routingOutcome: "draft" });
-  const approveAll = () => runWorkflowCommand({ type: "approve_reroute" });
+  const approved = state.routingOutcome === "approved";
+  const executed = state.routingOutcome === "executed";
+  const hasRecommendation = activeCase?.reroutePlans.some((plan) => plan.state === "draft") ?? false;
+  const reviewJob = (jobId: string) => { void runWorkflowCommand({ type: "review_reroute_job", jobId }); };
+  const advanceReroute = () => {
+    if (executed) { void runWorkflowCommand({ type: "confirm_reroute" }); return; }
+    if (!reviewed) { void runWorkflowCommand({ type: "review_reroute" }); return; }
+    if (approved) { void runWorkflowCommand({ type: "execute_reroute" }); return; }
+    void runWorkflowCommand({ type: "approve_reroute" });
+  };
+  const actionLabel = confirmed ? "Reroute confirmed" : executed ? "Confirm execution" : approved ? "Execute approved reroutes" : reviewed ? "Approve reviewed reroutes" : "Mark recommendations reviewed";
 
   return (
     <main className="min-h-screen bg-background px-5 py-8 text-[#1c1b1b] lg:px-8">
@@ -40,12 +50,13 @@ export function ReroutingControl() {
             </div>
             <button
               data-story="approve-reroute"
-              onClick={approveAll}
-              disabled={approved || pendingCommand === "approve_reroute"}
+              data-testid="reroute-workflow-action"
+              onClick={advanceReroute}
+              disabled={confirmed || (!hasRecommendation && !approved && !executed) || pendingCommand !== null}
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-black px-7 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#303030] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Route className="size-4" />
-              {approved ? "Routing plan approved" : pendingCommand === "approve_reroute" ? "Approving plan..." : "Approve proposed reroutes"}
+              {pendingCommand === "approve_reroute" ? "Approving plan..." : pendingCommand === "execute_reroute" ? "Executing approved plan..." : actionLabel}
             </button>
           </div>
           {commandError ? (
@@ -63,7 +74,7 @@ export function ReroutingControl() {
                 <Factory className="size-5 text-[#ba1a1a]" />Affected Jobs on WS-102
               </h2>
               <span className="rounded-full bg-[#efebe7] px-3 py-1.5 text-xs font-semibold tracking-[0.05em] text-[#5f5a5d]">
-                {approved ? "3 JOBS APPROVED" : "3 JOBS PENDING"}
+                {executed ? "3 JOBS EXECUTED" : approved ? "3 JOBS APPROVED" : hasRecommendation ? "3 JOBS FOR REVIEW" : "AWAITING RECOMMENDATION"}
               </span>
             </div>
             <div className="space-y-4 p-6">
@@ -73,10 +84,11 @@ export function ReroutingControl() {
                   job={job}
                   index={index}
                   expanded={expandedJob === job.id}
-                  selectedTarget={job.id === "J1003" ? "WS-108" : selected}
-                  approved={approved}
-                  onToggle={() => setExpandedJob((current) => current === job.id ? "" : job.id)}
-                  onSelectTarget={selectTarget}
+                  selectedTarget={activeCase?.rerouteDecisions.find(route => route.productionJobId === job.id)?.targetWorkstationId ?? selected}
+                  reviewed={reviewedJobIds.includes(job.id)}
+                  approved={approved || executed}
+                  onToggle={() => update({ expandedRerouteJobId: expandedJob === job.id ? "" : job.id })}
+                  onReview={() => reviewJob(job.id)}
                 />
               ))}
             </div>
@@ -98,7 +110,7 @@ export function ReroutingControl() {
                 <div>
                   <h2 className="font-semibold">Cell Routing Execution</h2>
                   <p className="mt-1 text-sm text-white/65">
-                    {approved ? "Approved in production workflow. Dispatch queue synced to cell controller." : "Verify cell load distribution and confirm shift handover before executing."}
+                    {executed ? "Execution is recorded. Refresh confirms the persisted job and capacity changes." : approved ? "Approval is recorded. Execution is still a separate, authorized action." : "The scheduler has produced recommendations only; review them before approval."}
                   </p>
                 </div>
               </div>
@@ -109,12 +121,12 @@ export function ReroutingControl() {
         <section className="mt-8">
           <OperationalPath
             title="Decision checks"
-            description="The selected route remains a recommendation until an authorized user approves it."
+            description="Recommendations are reviewed, approved, executed, and then confirmed as separate recorded steps."
             steps={[
-              { id: "capacity", label: "Capacity verified", detail: `${selected} retains enough scheduled capacity for the held work.`, state: "complete" },
-              { id: "capability", label: "Capability reviewed", detail: "Tooling, skill match, and priority remain visible to the scheduler.", state: "complete" },
-              { id: "approval", label: "Routing approval", detail: approved ? "The controlled routing plan is recorded as approved." : "Awaiting an authorized routing decision.", state: approved ? "complete" : "active" },
-              { id: "dispatch", label: "Dispatch release", detail: "Automated queue release scheduled for next shift change (14:00 IST).", state: "upcoming" },
+              { id: "recommendation", label: "Recommendation", detail: hasRecommendation || approved || executed ? "Capacity, tooling, skill, locks, and job priority were evaluated." : "Awaiting a persisted scheduler recommendation.", state: hasRecommendation || approved || executed ? "complete" : "active" },
+              { id: "review", label: "Review", detail: reviewed || approved || executed ? "A scheduler review was explicitly acknowledged in this session." : "Open each proposed move and review its constraints.", state: reviewed || approved || executed ? "complete" : hasRecommendation ? "active" : "upcoming" },
+              { id: "approval", label: "Approval", detail: approved || executed ? "The controlled routing plans are recorded as approved." : "An authorized scheduler must approve the reviewed plans.", state: approved || executed ? "complete" : reviewed ? "active" : "upcoming" },
+              { id: "execution", label: "Execution and confirmation", detail: executed ? "Jobs and capacity were updated atomically and recorded in the event history." : "Execution is blocked until approval.", state: executed ? "complete" : approved ? "active" : "upcoming" },
             ]}
           />
         </section>
@@ -128,17 +140,19 @@ function RerouteJob({
   index,
   expanded,
   selectedTarget,
+  reviewed,
   approved,
   onToggle,
-  onSelectTarget,
+  onReview,
 }: {
   job: (typeof demoReroutingJobs)[number];
   index: number;
   expanded: boolean;
   selectedTarget: string;
+  reviewed: boolean;
   approved: boolean;
   onToggle: () => void;
-  onSelectTarget: (target: string) => void;
+  onReview: () => void;
 }) {
   const priority = index === 0 ? { label: "High", color: "bg-[#ffdad6] text-[#ba1a1a]", bar: "bg-[#ff4d56]" } : index === 1 ? { label: "Medium", color: "bg-[#fff0c8] text-[#946400]", bar: "bg-amber-400" } : { label: "Low", color: "bg-[#e6e4e5] text-[#514f50]", bar: "bg-[#4968ef]" };
   return (
@@ -155,11 +169,11 @@ function RerouteJob({
         </div>
         <div>
           <span className="block text-[10px] font-semibold tracking-[0.06em] text-[#656165]">ORIGINAL CMT</span>
-          <strong className="mt-2 block text-sm">{index === 0 ? "Today, 14:00" : index === 1 ? "Tomorrow, 09:00" : "Tomorrow, 16:30"}</strong>
+          <strong className="mt-2 block text-sm">{new Date(Date.now() + (index + 1) * 4 * 60 * 60 * 1000).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" })}</strong>
         </div>
-        <span className={cn("ml-auto inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm", approved ? "border-emerald-700 bg-emerald-50 text-emerald-700" : expanded ? "border-black bg-[#efebe7]" : "border-[#ded8d1] text-[#5e595d]")}>
-          {approved ? <Check className="size-4" /> : null}
-          {approved ? "Approved" : expanded ? "Reviewing" : "Pending"}
+        <span className={cn("ml-auto inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm", approved || reviewed ? "border-emerald-700 bg-emerald-50 text-emerald-700" : expanded ? "border-black bg-[#efebe7]" : "border-[#ded8d1] text-[#5e595d]")}>
+          {approved || reviewed ? <Check className="size-4" /> : null}
+          {approved ? "Approved" : reviewed ? "Reviewed" : expanded ? "Reviewing" : "Pending"}
           <ChevronDown className={cn("size-4 transition-transform", expanded && "rotate-180")} />
         </span>
       </button>
@@ -179,8 +193,8 @@ function RerouteJob({
               <CheckItem label="Priority" detail="Meets SLA" />
             </div>
             <div className="flex flex-row gap-2 lg:flex-col">
-              <button onClick={() => onSelectTarget(selectedTarget === "WS-105" ? "WS-108" : "WS-105")} className="flex-1 rounded-xl border border-[#d7d1cc] px-4 py-3 text-sm font-semibold hover:bg-[#f6f3ef]">Edit Target</button>
-              <button onClick={() => onToggle()} className="flex-1 rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white hover:bg-[#303030]">Confirm</button>
+              <button disabled className="flex-1 cursor-not-allowed rounded-xl border border-[#d7d1cc] px-4 py-3 text-sm font-semibold text-[#777]">Target set by recommendation</button>
+              <button onClick={() => { onReview(); onToggle(); }} disabled={approved || reviewed} className="flex-1 rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white hover:bg-[#303030] disabled:opacity-50">{reviewed ? "Review saved" : "Mark job reviewed"}</button>
             </div>
           </div>
         </div>
