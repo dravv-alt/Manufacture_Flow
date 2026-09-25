@@ -24,17 +24,8 @@ export function isEvidenceMet(
         snapshot.reservations?.some((r) => r.status === "active" || r.status === "reserved")
       );
 
-    case "reroute_reviewed":
-      return Boolean(snapshot.rerouteDecisions?.length) && snapshot.rerouteDecisions.every((decision) => ["reviewed", "executed"].includes(decision.outcome));
-
     case "reroute_approved":
       return Boolean(snapshot.reroutePlans?.some((p) => p.state === "approved"));
-
-    case "reroute_executed":
-      return Boolean(snapshot.reroutePlans?.length) && snapshot.reroutePlans.every((plan) => plan.state === "executed");
-
-    case "reroute_confirmed":
-      return Boolean(snapshot.events?.some((event) => event.eventType === "reroute_confirmed"));
 
     case "notification_created":
       return Boolean(snapshot.notifications && snapshot.notifications.length > 0);
@@ -70,14 +61,8 @@ export function evidenceLabel(evidence: StoryEvidence): string {
       return "Active failure case with maintenance work order";
     case "bearing_reserved":
       return "Bearing reservation recorded in warehouse";
-    case "reroute_reviewed":
-      return "Production reroute recommendations reviewed";
     case "reroute_approved":
       return "Production reroute plan approved";
-    case "reroute_executed":
-      return "Production reroute plans executed";
-    case "reroute_confirmed":
-      return "Production reroute execution confirmed";
     case "notification_created":
       return "Stakeholder notification queued";
     case "maintenance_stage":

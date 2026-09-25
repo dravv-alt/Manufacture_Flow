@@ -12,7 +12,7 @@ export function ReroutingControl() {
   const expandedJob = state.expandedRerouteJobId;
   const reviewedJobIds = state.reviewedRerouteJobIds;
   const reviewed = activeCase?.productionJobs.every(job => reviewedJobIds.includes(job.externalId)) ?? false;
-  const confirmed = activeCase?.events.some(event => event.eventType === "reroute_confirmed") ?? false;
+  const confirmed = activeCase?.events.some(event => event.eventType === "confirm_reroute") ?? false;
   const selected = state.rerouteTargetId || "WS-105";
   const approved = state.routingOutcome === "approved";
   const executed = state.routingOutcome === "executed";
@@ -56,7 +56,7 @@ export function ReroutingControl() {
               className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-black px-7 text-sm font-bold text-white shadow-md transition-colors hover:bg-[#303030] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Route className="size-4" />
-              {pendingCommand === "review_reroute" ? "Saving review..." : pendingCommand === "approve_reroute" ? "Approving plan..." : pendingCommand === "execute_reroute" ? "Executing approved plan..." : pendingCommand === "confirm_reroute" ? "Confirming execution..." : actionLabel}
+              {pendingCommand === "approve_reroute" ? "Approving plan..." : pendingCommand === "execute_reroute" ? "Executing approved plan..." : actionLabel}
             </button>
           </div>
           {commandError ? (

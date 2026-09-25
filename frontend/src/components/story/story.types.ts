@@ -15,10 +15,7 @@ export type StoryAction =
 export type StoryEvidence =
   | { type: "active_case" }
   | { type: "bearing_reserved" }
-  | { type: "reroute_reviewed" }
   | { type: "reroute_approved" }
-  | { type: "reroute_executed" }
-  | { type: "reroute_confirmed" }
   | { type: "notification_created" }
   | { type: "maintenance_stage"; min: number }
   | { type: "validation_failed" }
