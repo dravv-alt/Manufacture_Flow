@@ -15,7 +15,10 @@ services:
   backend:
     build: { context: ., dockerfile: backend/Dockerfile }
     environment:
+      APP_RUNTIME: ${APP_RUNTIME:-live}
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      LIVE_DATABASE_URL: ${LIVE_DATABASE_URL:?set LIVE_DATABASE_URL}
+      DEMO_DATABASE_URL: ${DEMO_DATABASE_URL:?set DEMO_DATABASE_URL}
       FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN}
     depends_on: { db: { condition: service_healthy } }
     ports: ["3001:3001"]
