@@ -5,6 +5,7 @@ import { applyMaintenanceExecutionAction, isMaintenanceExecutionAction, Maintena
 
 export type WorkflowAction =
   | { type: "reserve_part"; actor: string; quantity: number }
+  | { type: "schedule_maintenance"; actor: string }
   | { type: "approve_reroute"; actor: string }
   | { type: "execute_reroute"; actor: string }
   | { type: "advance_maintenance"; actor: string; expectedStage: number }
@@ -139,6 +140,44 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
       const [reservation] = await tx.insert(inventoryReservations).values({ inventoryItemId: inventory.id, failureCaseId: failureCase.id, quantity: action.quantity, actor: action.actor }).returning();
       await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "inventory_reservation", entityId: reservation.id, eventType: "part_reserved", actor: action.actor, payload: { quantity: action.quantity, inventoryItemId: inventory.id } });
       return { action: action.type, reservation, inventory: updated[0] };
+    }
+
+    if (action.type === "schedule_maintenance") {
+      const [workOrder] = await tx.select().from(maintenanceWorkOrders).where(eq(maintenanceWorkOrders.failureCaseId, failureCase.id)).limit(1);
+      if (!workOrder) throw new OperationNotFoundError("No maintenance work order exists for this failure case.");
+
+      const [activeReservation] = await tx.select().from(inventoryReservations)
+        .where(and(eq(inventoryReservations.failureCaseId, failureCase.id), eq(inventoryReservations.status, "active")))
+        .limit(1);
+      const targetStage = activeReservation ? 3 : 2;
+
+      // Repeating the schedule command is safe: return the current record rather
+      // than creating a duplicate event or moving the work order backwards.
+      if (workOrder.stage >= targetStage) {
+        return { action: action.type, idempotent: true, workOrder, reservation: activeReservation ?? null };
+      }
+
+      const [updatedWorkOrder] = await tx.update(maintenanceWorkOrders)
+        .set({ stage: targetStage, updatedAt: new Date() })
+        .where(and(eq(maintenanceWorkOrders.id, workOrder.id), eq(maintenanceWorkOrders.stage, workOrder.stage)))
+        .returning();
+      if (!updatedWorkOrder) throw new OperationConflictError("The maintenance work order changed before scheduling. Refresh and retry.");
+
+      const workflowState = activeReservation
+        ? "Maintenance planned / ready for execution"
+        : "Maintenance scheduled / awaiting bearing reservation";
+      await tx.update(failureCases)
+        .set({ workflowState, updatedAt: new Date() })
+        .where(eq(failureCases.id, failureCase.id));
+      await tx.insert(workflowEvents).values({
+        failureCaseId: failureCase.id,
+        entityType: "maintenance_work_order",
+        entityId: updatedWorkOrder.id,
+        eventType: "maintenance_scheduled",
+        actor: action.actor,
+        payload: { fromStage: workOrder.stage, toStage: targetStage, reservationId: activeReservation?.id ?? null },
+      });
+      return { action: action.type, idempotent: false, workOrder: updatedWorkOrder, reservation: activeReservation ?? null };
     }
 
     if (action.type === "approve_reroute") {

@@ -4,6 +4,7 @@ export type UserRole = typeof users.$inferSelect.role;
 
 export const WORKFLOW_ACTION_ROLES = {
   reserve_part: ["Plant Manager", "Warehouse Team"],
+  schedule_maintenance: ["Plant Manager", "Maintenance Lead", "Scheduler"],
   approve_reroute: ["Plant Manager", "Scheduler"],
   execute_reroute: ["Plant Manager", "Scheduler"],
   advance_maintenance: ["Plant Manager", "Maintenance Lead"],
