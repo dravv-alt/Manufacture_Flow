@@ -476,10 +476,10 @@ export function StoryModeController() {
     }
 
     if (currentStep.mode === "action") {
-      if (currentStep.action.type === "workflow" && currentStep.action.command) {
-        await latest.current.runWorkflowCommand(currentStep.action.command);
-      } else if (targetElement) {
+      if (targetElement) {
         await performClickAction(targetElement, "ACTION");
+      } else if (currentStep.action.type === "workflow" && currentStep.action.command) {
+        await latest.current.runWorkflowCommand(currentStep.action.command);
       }
       await waitForEvidence(currentStep);
       return;
