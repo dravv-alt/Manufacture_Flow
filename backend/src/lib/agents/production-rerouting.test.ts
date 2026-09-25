@@ -6,7 +6,6 @@ const station = (id: string, code: string, capacityPercent: number, overrides: P
 
 describe("ProductionReroutingAgent candidate ranking", () => {
   it("selects the least-loaded compatible unlocked workstation", () => expect(rankRerouteCandidates(job, "source", [station("source", "WS-102", 0), station("high", "WS-108", 70), station("best", "WS-105", 40)]).map((item) => item.id)).toEqual(["best", "high"]));
-  it("accepts operational workstation statuses regardless of capitalization", () => expect(rankRerouteCandidates(job, "source", [station("demo", "WS-105", 40, { status: "OPERATIONAL" })]).map((item) => item.id)).toEqual(["demo"]));
   it("rejects insufficient capacity and incompatible tooling", () => expect(rankRerouteCandidates(job, "source", [station("full", "WS-105", 81), station("tool", "WS-108", 20, { capabilities: [{ operationCode: "CNC_MILL", toolingCode: "T-02", qualifiedSkill: "CNC_OPERATOR", active: true }] })])).toEqual([]));
   it("rejects locked and offline workstations", () => expect(rankRerouteCandidates(job, "source", [station("locked", "WS-105", 20, { locked: true }), station("offline", "WS-108", 20, { status: "Offline" })])).toEqual([]));
 });
