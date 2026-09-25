@@ -2,9 +2,11 @@ import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/client";
 import { failureCases, workflowEvents } from "@/lib/db/schema";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 export async function GET(_: Request, context: { params: Promise<{ caseId: string }> }) {
+  if (!await getCurrentUser()) return NextResponse.json({ error: "AUTHENTICATION_REQUIRED" }, { status: 401 });
   const { caseId } = await context.params;
   const [failureCase] = await db.select({ id: failureCases.id }).from(failureCases).where(eq(failureCases.externalId, caseId)).limit(1);
   if (!failureCase) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });

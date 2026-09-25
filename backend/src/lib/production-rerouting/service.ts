@@ -31,19 +31,19 @@ export async function runProductionRerouting(input: { recoveryTimeEstimateId: st
           await tx.insert(workflowEvents).values({ failureCaseId: context.failureCaseId, entityType: "reroute_decision", entityId: decision.id, eventType: "reroute_requires_intervention", actor: "Production Rerouting Agent", payload: { correlationId: input.correlationId, productionJobId: job.id, ...rationale } });
           decisions.push(decision); continue;
         }
-        const [decision] = await tx.insert(rerouteDecisions).values({ failureCaseId: context.failureCaseId, productionJobId: job.id, sourceWorkstationId: context.sourceWorkstationId, targetWorkstationId: selected.id, correlationId: input.correlationId, outcome: "rerouted", rationale: { ...rationale, selectedWorkstationCode: selected.code, projectedCapacityPercent: selected.capacityPercent + job.estimatedLoadPercent } }).returning();
-        await tx.update(productionJobs).set({ workstationId: selected.id, rerouteEvaluationRequired: false, rerouteEvaluationReason: null, updatedAt: new Date() }).where(eq(productionJobs.id, job.id));
-        await tx.update(workstations).set({ capacityPercent: selected.capacityPercent + job.estimatedLoadPercent, updatedAt: new Date() }).where(eq(workstations.id, selected.id));
+        const [decision] = await tx.insert(rerouteDecisions).values({ failureCaseId: context.failureCaseId, productionJobId: job.id, sourceWorkstationId: context.sourceWorkstationId, targetWorkstationId: selected.id, correlationId: input.correlationId, outcome: "recommended", rationale: { ...rationale, selectedWorkstationCode: selected.code, projectedCapacityPercent: selected.capacityPercent + job.estimatedLoadPercent } }).returning();
+        // The agent can recommend a feasible destination, but it must not dispatch work.
+        // Capacity and job ownership stay unchanged until an authorized execution command.
         loads.set(selected.id, selected.capacityPercent + job.estimatedLoadPercent);
-        await tx.insert(reroutePlans).values({ failureCaseId: context.failureCaseId, sourceWorkstationId: context.sourceWorkstationId, targetWorkstationId: selected.id, affectedJobs: [job.externalId], state: "executed", approvedBy: "Production Rerouting Agent", approvedAt: new Date() });
-        await tx.insert(workflowEvents).values({ failureCaseId: context.failureCaseId, entityType: "reroute_decision", entityId: decision.id, eventType: "production_job_rerouted", actor: "Production Rerouting Agent", payload: { correlationId: input.correlationId, productionJobId: job.id, targetWorkstationCode: selected.code, ...rationale } });
+        await tx.insert(reroutePlans).values({ failureCaseId: context.failureCaseId, sourceWorkstationId: context.sourceWorkstationId, targetWorkstationId: selected.id, affectedJobs: [job.externalId], state: "draft" });
+        await tx.insert(workflowEvents).values({ failureCaseId: context.failureCaseId, entityType: "reroute_decision", entityId: decision.id, eventType: "reroute_recommended", actor: "Production Rerouting Agent", payload: { correlationId: input.correlationId, productionJobId: job.id, targetWorkstationCode: selected.code, ...rationale } });
         decisions.push(decision);
       }
       const unresolved = decisions.some((decision) => decision.outcome === "no_feasible_candidate");
-      await tx.update(failureCases).set({ workflowState: unresolved ? "Reroute intervention required" : "Production jobs rerouted / recovery execution pending", updatedAt: new Date() }).where(eq(failureCases.id, context.failureCaseId));
+      await tx.update(failureCases).set({ workflowState: unresolved ? "Reroute intervention required" : "Reroute recommendations awaiting review", updatedAt: new Date() }).where(eq(failureCases.id, context.failureCaseId));
       return { decisions, unresolved };
     });
-    await db.update(agentRuns).set({ status: "completed", output: { rerouteDecisionIds: result.decisions.map((decision) => decision.id), outcome: result.unresolved ? "requires_intervention" : "rerouted" }, completedAt: new Date() }).where(eq(agentRuns.id, createdRun.id));
+    await db.update(agentRuns).set({ status: "completed", output: { rerouteDecisionIds: result.decisions.map((decision) => decision.id), outcome: result.unresolved ? "requires_intervention" : "recommendations_ready" }, completedAt: new Date() }).where(eq(agentRuns.id, createdRun.id));
     return { idempotent: false, agentRun: { id: createdRun.id, status: "completed" as const }, decisions: result.decisions };
   } catch (error) { await db.update(agentRuns).set({ status: "failed", error: error instanceof Error ? error.message : "Production rerouting unavailable.", completedAt: new Date() }).where(eq(agentRuns.id, createdRun.id)); throw error; }
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { failureCases, maintenanceWorkOrders, recoveryGraphRuns, workstationAllocationLocks, workstations, workflowEvents } from "@/lib/db/schema";
 import { MAINTENANCE_STAGE, MaintenanceStagePolicyError, nextMaintenanceStage } from "./policy";
@@ -26,14 +26,7 @@ export async function applyMaintenanceExecutionAction(failureCaseExternalId: str
     let [failureCase] = await tx.select().from(failureCases).where(
       isUuid ? or(eq(failureCases.externalId, failureCaseExternalId), eq(failureCases.id, failureCaseExternalId)) : eq(failureCases.externalId, failureCaseExternalId)
     ).limit(1);
-    if (!failureCase) {
-      const [latestCase] = await tx.select().from(failureCases).orderBy(desc(failureCases.detectedAt)).limit(1);
-      if (latestCase) {
-        failureCase = latestCase;
-      } else {
-        throw new MaintenanceExecutionNotFoundError(`Failure case ${failureCaseExternalId} was not found.`);
-      }
-    }
+    if (!failureCase) throw new MaintenanceExecutionNotFoundError(`Failure case ${failureCaseExternalId} was not found.`);
     const [workOrder] = await tx.select().from(maintenanceWorkOrders).where(and(eq(maintenanceWorkOrders.id, action.workOrderId), eq(maintenanceWorkOrders.failureCaseId, failureCase.id))).limit(1);
     if (!workOrder) throw new MaintenanceExecutionNotFoundError("The maintenance work order does not belong to this failure case.");
     if (workOrder.workstationId !== failureCase.workstationId) throw new MaintenanceExecutionConflictError("Maintenance work-order workstation linkage does not match the failure incident.");

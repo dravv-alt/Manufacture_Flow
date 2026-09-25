@@ -280,14 +280,14 @@ export const workstationCapabilities = pgTable("workstation_capabilities", {
 export const rerouteDecisions = pgTable("reroute_decisions", {
   id: uuid("id").primaryKey().defaultRandom(),
   failureCaseId: uuid("failure_case_id").notNull().references(() => failureCases.id, { onDelete: "restrict" }),
-  productionJobId: uuid("production_job_id").notNull().references(() => productionJobs.id, { onDelete: "restrict" }).unique(),
+  productionJobId: uuid("production_job_id").notNull().references(() => productionJobs.id, { onDelete: "restrict" }),
   sourceWorkstationId: uuid("source_workstation_id").notNull().references(() => workstations.id, { onDelete: "restrict" }),
   targetWorkstationId: uuid("target_workstation_id").references(() => workstations.id, { onDelete: "restrict" }),
   correlationId: varchar("correlation_id", { length: 160 }).notNull(),
   outcome: varchar("outcome", { length: 64 }).notNull(),
   rationale: jsonb("rationale").notNull().$type<Record<string, unknown>>(),
   ...timestamps,
-}, (table) => [index("reroute_decisions_case_idx").on(table.failureCaseId), index("reroute_decisions_correlation_idx").on(table.correlationId)]);
+}, (table) => [uniqueIndex("reroute_decisions_job_correlation_idx").on(table.productionJobId, table.correlationId), index("reroute_decisions_case_idx").on(table.failureCaseId), index("reroute_decisions_correlation_idx").on(table.correlationId)]);
 
 export const inventoryItems = pgTable("inventory_items", {
   id: uuid("id").primaryKey().defaultRandom(),

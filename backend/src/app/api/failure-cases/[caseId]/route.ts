@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCaseDetail, OperationNotFoundError } from "@/lib/operations/service";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_: Request, context: { params: Promise<{ caseId: string }> }) {
+  if (!await getCurrentUser()) return NextResponse.json({ error: "AUTHENTICATION_REQUIRED" }, { status: 401 });
   try {
     const { caseId } = await context.params;
     return NextResponse.json(await getCaseDetail(caseId));

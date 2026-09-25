@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { TelemetryNotFoundError, ingestTelemetry, listRecentTelemetry } from "@/lib/telemetry/service";
 import { telemetryIngestSchema } from "@/lib/telemetry/validation";
+import { getCurrentUser } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  if (!await getCurrentUser()) return NextResponse.json({ error: "AUTHENTICATION_REQUIRED" }, { status: 401 });
   const url = new URL(request.url);
   const workstationCode = url.searchParams.get("workstationCode")?.trim();
   const rawLimit = Number(url.searchParams.get("limit") ?? "50");
