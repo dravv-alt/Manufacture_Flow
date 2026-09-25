@@ -11,6 +11,17 @@ In modern manufacturing plants, unexpected workstation breakdowns cause domino-e
 
 When telemetry anomalies indicate impending machine failure, ManufactureFlow's multi-agent graph predicts the failure, alerts supervisors, halts new job dispatch, verifies warehouse inventory, procures missing spare parts, schedules maintenance, estimates recovery timelines, reroutes active jobs to compatible machines, calculates delivery impacts on customer shipments, and keeps all stakeholders informed in real time.
 
+## Runtime modes and data boundary
+
+The repository supports two explicit operating modes:
+
+- **Interactive demo (default frontend mode):** controlled, constraint-derived mock telemetry and workflow data. Browser state is persisted in local storage so actions remain visible when moving between workspaces. No real machinery, carrier, vendor, customer, or external notification is contacted.
+- **Backend mode:** the frontend calls the authenticated Next.js API and PostgreSQL-backed workflow services. Select it with `NEXT_PUBLIC_OPERATIONS_MODE=backend` and point `NEXT_PUBLIC_API_BASE_URL` at the public backend URL.
+
+Demo values are generated from workstation telemetry rules and workflow constraints rather than being arbitrary display-only numbers. The demo path is a replaceable boundary for future verified plant, ERP/WMS, carrier, weather, and ML integrations; it must not be described as live industrial telemetry.
+
+Rerouting follows the enforced sequence `recommendation → review → approval → execution → confirmation`. An approval does not move a production job, and an unknown failure-case ID returns not-found instead of falling back to the newest case.
+
 ---
 
 ## 🤖 Autonomous Multi-Agent Recovery Architecture (LangGraph)
@@ -107,7 +118,7 @@ This monorepo separates frontend user interfaces from backend orchestrations:
 │   ├── src/
 │   │   ├── app/                  # App Router pages (/dashboard, /twin, /failure, etc.)
 │   │   ├── components/           # UI Components, Workspaces, 3D Digital Twin, Story Controller
-│   │   ├── contexts/             # OperationsContext & application state management
+│   │   ├── contexts/             # Backend adapter and persistent interactive demo workflow
 │   │   ├── demo-data/            # Controlled demo baseline data
 │   │   └── lib/                  # API client and runtime config
 │   └── package.json
@@ -130,7 +141,10 @@ This monorepo separates frontend user interfaces from backend orchestrations:
 │   ├── BACKEND_SETUP.md          # Backend configuration and local demo accounts
 │   └── LIVE_DEMO_ARCHITECTURE.md # Persistence, session isolation, and realtime rules
 │
-├── docker-compose.yml            # PostgreSQL multi-database container config
+├── archive/                      # Redundant/legacy source retained for traceability
+├── docker-compose.yml            # Local PostgreSQL multi-database container config
+├── docker-compose.production.yml # Production-like DB/backend/frontend stack
+├── docs/DEPLOYMENT.md            # Vercel, Railway, migrations, and Docker runbook
 ├── package.json                  # Workspace orchestrator package.json
 └── run-project.bat               # One-click launcher script
 ```
@@ -143,7 +157,7 @@ This monorepo separates frontend user interfaces from backend orchestrations:
 - **Node.js** 20+
 - **Docker Desktop** (for PostgreSQL)
 
-### 1. Launch with One-Click Script (Windows)
+### 1. Launch the controlled demo (Windows)
 Double-click `run-project.bat` or run in PowerShell:
 ```powershell
 ./run-project.bat
@@ -152,7 +166,10 @@ This will:
 1. Start PostgreSQL on port `5434`
 2. Create and migrate both `Live` and `Demo` databases
 3. Validate schema parity and seed baseline data
-4. Launch the Frontend (`http://localhost:3000`), Live API (`http://localhost:3001`), and Demo API (`http://localhost:3002`)
+4. Launch the Frontend (`http://localhost:3000`) and backend services (`http://localhost:3001` / `http://localhost:3002`)
+
+The frontend remains in its persistent interactive demo mode unless
+`NEXT_PUBLIC_OPERATIONS_MODE=backend` is configured.
 
 ### 2. Manual Commands
 
@@ -161,18 +178,59 @@ This will:
 npm run db:up
 
 # Run migrations and setup demo database
+npm run db:create:demo
 npm run db:migrate:all
 npm run db:parity
 npm run db:seed
+npm --prefix backend run db:seed:demo
 
 # Start applications
-npm run dev:frontend   # Runs on http://localhost:3000
-npm run dev:backend    # Runs on http://localhost:3001
+npm run dev:frontend       # Runs on http://localhost:3000
+npm run dev:backend:live   # Live API on http://localhost:3001
+npm run dev:backend:demo   # Isolated demo API on http://localhost:3002
+
+# Point the frontend at the authenticated backend instead of the local demo
+$env:NEXT_PUBLIC_OPERATIONS_MODE="backend"
+$env:NEXT_PUBLIC_API_BASE_URL="http://localhost:3001"
+npm run dev:frontend
 
 # Run tests and type verification
 npm run typecheck
 npm run test
+npm run build
 ```
+
+### 3. Vercel + Railway deployment
+
+Deploy `frontend/` to Vercel and `backend/` to Railway. The browser must use a public HTTPS backend URL; it cannot resolve the Docker service name `backend`.
+
+Vercel frontend variables:
+
+```text
+NEXT_PUBLIC_OPERATIONS_MODE=backend
+NEXT_PUBLIC_API_BASE_URL=https://<railway-backend-domain>
+```
+
+Railway backend variables must include distinct database URLs and the allowed frontend origin:
+
+```text
+APP_RUNTIME=live
+DATABASE_URL=<live-database-url>
+LIVE_DATABASE_URL=<live-database-url>
+DEMO_DATABASE_URL=<separate-demo-database-url>
+FRONTEND_ORIGIN=https://<vercel-frontend-domain>
+TELEMETRY_INGEST_API_KEY=<long-random-secret>
+```
+
+Run the complete migration lineage as a Railway release/one-time command before traffic reaches the service, then verify `GET /api/health`, sign-in, one authorized workflow action, audit history, and notification history. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the exact migration and Docker sequence.
+
+### 4. Verification status and known limitations
+
+The current repository has verified frontend/backend builds, typechecks, unit tests, live/demo schema parity, runtime health, Docker image builds, container migration, backend health, frontend response, and unauthenticated protected-read rejection. Browser Playwright flows still require a suitable browser installation and should be run in CI or a non-OneDrive checkout.
+
+The application is deployment-ready as a controlled demonstration and backend workflow foundation. It is not a substitute for verified industrial telemetry or production integrations: machinery telemetry, ERP/WMS, scheduling, carrier/weather services, ML predictions, external notification delivery, managed backups, monitoring, and an approved identity provider remain deployment responsibilities.
+
+If Docker BuildKit reports `invalid file request Dockerfile` from a Windows OneDrive checkout, build from a normal local or WSL filesystem clone. This is a host reparse-point limitation, not a repository Compose syntax error.
 
 ---
 
@@ -190,3 +248,5 @@ npm run test
 - [Business Requirement Document (BRD)](docs/PS.md)
 - [Backend Setup & Demo Accounts](docs/BACKEND_SETUP.md)
 - [Live Demo & Architecture Guide](docs/LIVE_DEMO_ARCHITECTURE.md)
+- [Deployment Runbook](docs/DEPLOYMENT.md)
+- [Archive Policy](archive/README.md)
