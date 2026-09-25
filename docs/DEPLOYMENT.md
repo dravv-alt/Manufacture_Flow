@@ -57,6 +57,18 @@ APP_RUNTIME=live sh -c 'cd backend && npx drizzle-kit migrate'
 APP_RUNTIME=demo sh -c 'cd backend && npx drizzle-kit migrate'
 ```
 
+After migrating the Live database, seed its initial Plant Manager account and
+workflow records once from the Live API service console:
+
+```text
+cd backend && APP_RUNTIME=live npx tsx scripts/seed-db.ts
+```
+
+The seed is idempotent. It creates `manager@northfab.local` with password
+`MachineOverwatch!2026`, plus the WS-102 failure case and related workflow
+records. Demo data is seeded separately by opening Demo Mode and using its
+reset control; do not run the Live seed command against the Demo service.
+
 After the demo service is healthy, open Demo Mode once and use its reset control to seed the isolated demo scenario. Confirm that the demo service health endpoint reports `mode: demo` and that its database is not the live database.
 
 ## Local Docker Compose
