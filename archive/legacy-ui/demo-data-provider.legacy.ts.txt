@@ -1,3 +1,8 @@
+// REDUNDANT LEGACY CODE — retained for traceability only.
+// The active demo runtime now uses DemoOperationsProvider and the persisted
+// demo workflow engine. Do not import this archived provider into application
+// routes or components.
+
 // demo_data
 import { demoEnvironment } from "@/demo-data/environment";
 import type { DemoDataProvider, OperationsDataProvider } from "@/demo-data/types";
