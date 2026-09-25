@@ -12,6 +12,8 @@ RUN npm --prefix frontend run build
 FROM node:24-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/frontend/.next/standalone ./
 COPY --from=build /app/frontend/.next/static ./frontend/.next/static
