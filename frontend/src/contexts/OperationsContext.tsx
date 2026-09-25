@@ -5,13 +5,15 @@ import { demoOperationsSnapshot, type DataCondition, type FailureCase, type Role
 import { normalizeRecoveryScenario, type ProcurementState, type RecoveryScenarioId, type ShipmentState } from "@/demo-data/ws102-scenario";
 import type { Workstation } from "@/demo-data/workstations";
 import { apiFetch, getApiBaseUrl, setApiRuntime, type FrontendRuntimeMode } from "@/lib/api-client";
+import { DemoOperationsProvider } from "./DemoOperationsProvider";
 
 export type DemoScenarioId = "golden" | "local-spare" | "failure-rework";
 export type StoryMode = "manual" | "auto";
 export type InventoryState = "available" | "unavailable" | "contention" | "stale" | "failed";
-export type RoutingOutcome = "draft" | "approved" | "partial" | "no-compatible" | "stale" | "conflict";
+export type RoutingOutcome = "draft" | "review" | "approved" | "executed" | "partial" | "no-compatible" | "stale" | "conflict";
 export type WorkflowCommand =
-  | { type: "reserve_part"; quantity: number } | { type: "approve_reroute" } | { type: "advance_maintenance"; expectedStage: number }
+  | { type: "review_reroute" } | { type: "review_reroute_job"; jobId: string } | { type: "confirm_reroute" } | { type: "schedule_maintenance" } | { type: "receive_part" }
+  | { type: "reserve_part"; quantity: number } | { type: "approve_reroute" } | { type: "execute_reroute" } | { type: "advance_maintenance"; expectedStage: number }
   | { type: "start_maintenance"; workOrderId: string; expectedStage: number; notes?: string }
   | { type: "record_repair_completion"; workOrderId: string; expectedStage: number; notes: string }
   | { type: "start_machine_testing"; workOrderId: string; expectedStage: number; notes?: string }
@@ -23,10 +25,10 @@ export type WorkflowCommand =
 export interface OperationsState {
   selectedWorkstationId: string; selectedComponentId: string; twinMode: TwinMode; role: Role; condition: DataCondition;
   allocationBlocked: boolean; inventoryState: InventoryState; inventoryAvailable: boolean; bearingReserved: boolean; rerouteTargetId: string;
-  routingApproved: boolean; routingOutcome: RoutingOutcome; procurementState: ProcurementState; procurementNote: string; procurementNotes: string[];
+  routingApproved: boolean; routingOutcome: RoutingOutcome; expandedRerouteJobId: string; reviewedRerouteJobIds: string[]; procurementState: ProcurementState; procurementNote: string; procurementNotes: string[];
   recoveryScenario: RecoveryScenarioId; maintenanceStage: number; maintenanceAssignee: string; shipmentState: ShipmentState; reducedMotion: boolean;
 }
-export const initialOperationsState: OperationsState = { selectedWorkstationId: "", selectedComponentId: "", twinMode: "health", role: "Plant Manager", condition: "loading", allocationBlocked: false, inventoryState: "unavailable", inventoryAvailable: false, bearingReserved: false, rerouteTargetId: "", routingApproved: false, routingOutcome: "draft", procurementState: "draft", procurementNote: "", procurementNotes: [], recoveryScenario: "local", maintenanceStage: 0, maintenanceAssignee: "Unassigned", shipmentState: "no-impact", reducedMotion: false };
+export const initialOperationsState: OperationsState = { selectedWorkstationId: "", selectedComponentId: "", twinMode: "health", role: "Plant Manager", condition: "loading", allocationBlocked: false, inventoryState: "unavailable", inventoryAvailable: false, bearingReserved: false, rerouteTargetId: "", routingApproved: false, routingOutcome: "draft", expandedRerouteJobId: "J1001", reviewedRerouteJobIds: [], procurementState: "draft", procurementNote: "", procurementNotes: [], recoveryScenario: "local", maintenanceStage: 0, maintenanceAssignee: "Unassigned", shipmentState: "no-impact", reducedMotion: false };
 
 type Action = { type: "patch"; patch: Partial<OperationsState> } | { type: "reset" };
 type AuthenticatedUser = { email: string; displayName: string; role: Role };
@@ -35,11 +37,15 @@ export type BackendCaseSnapshot = { failureCase: { id: string; externalId: strin
 type OperationsData = Omit<typeof demoOperationsSnapshot, "workstations" | "failures"> & { workstations: Workstation[]; failures: FailureCase[] };
 type ContextValue = { state: OperationsState; data: OperationsData; overview: Overview | null; activeCase: BackendCaseSnapshot | null; currentCaseId: string | null; runtime: FrontendRuntimeMode; demoScenario: DemoScenarioId; storyMode: StoryMode; runtimeBusy: boolean; backendError: string | null; realtimeConnected: boolean; update: (patch: Partial<OperationsState>) => void; reset: () => void; refresh: () => Promise<void>; runWorkflowCommand: (command: WorkflowCommand) => Promise<boolean>; pendingCommand: WorkflowCommand["type"] | null; commandError: string | null; clearCommandError: () => void; currentUser: AuthenticatedUser | null; signOut: () => Promise<void>; enterDemo: (scenario: DemoScenarioId, mode: StoryMode) => Promise<boolean>; resetDemo: (scenario?: DemoScenarioId) => Promise<boolean>; triggerDemo: () => Promise<boolean>; exitDemo: () => Promise<void> };
 
-const OperationsContext = createContext<ContextValue | null>(null);
+export const OperationsContext = createContext<ContextValue | null>(null);
 function reducer(state: OperationsState, action: Action) { return action.type === "reset" ? initialOperationsState : { ...state, ...action.patch }; }
 function statusForUi(status: string): Workstation["status"] { if (/recover/i.test(status)) return "Recovered"; if (/maint|shutdown|rework|validation/i.test(status)) return "Under Maintenance"; if (/risk/i.test(status)) return "At Risk"; if (/down/i.test(status)) return "Down"; return "Operational"; }
 
 export function OperationsProvider({ children }: { children: ReactNode }) {
+  return process.env.NEXT_PUBLIC_OPERATIONS_MODE === "backend" ? <BackendOperationsProvider>{children}</BackendOperationsProvider> : <DemoOperationsProvider>{children}</DemoOperationsProvider>;
+}
+
+function BackendOperationsProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialOperationsState); const [runtime, setRuntime] = useState<FrontendRuntimeMode>("live"); const [demoScenario, setDemoScenario] = useState<DemoScenarioId>("golden"); const [storyMode, setStoryMode] = useState<StoryMode>("manual");
   const [overview, setOverview] = useState<Overview | null>(null); const [activeCase, setActiveCase] = useState<BackendCaseSnapshot | null>(null); const [pendingCommand, setPendingCommand] = useState<WorkflowCommand["type"] | null>(null); const [commandError, setCommandError] = useState<string | null>(null); const [backendError, setBackendError] = useState<string | null>(null); const [currentUser, setCurrentUser] = useState<AuthenticatedUser | null>(null); const [runtimeBusy, setRuntimeBusy] = useState(false); const [realtimeConnected, setRealtimeConnected] = useState(false);
   const refreshVersion = useRef(0);
@@ -49,17 +55,15 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const update = useCallback((patch: Partial<OperationsState>) => dispatch({ type: "patch", patch }), []);
-  const hydrateCase = useCallback((snapshot: BackendCaseSnapshot | null) => { setActiveCase(snapshot); if (!snapshot) return; const inventory = snapshot.inventory[0]; const workOrder = snapshot.maintenanceWorkOrders[0]; const procurement = snapshot.procurementRequests[0]; const shipment = snapshot.shipmentImpacts[0]; update({ selectedWorkstationId: snapshot.workstation?.code ?? "", selectedComponentId: snapshot.part?.code ?? "", allocationBlocked: snapshot.allocationLocks.some((lock) => lock.state === "active"), bearingReserved: snapshot.reservations.some((item) => item.status === "active"), inventoryAvailable: Boolean(inventory && inventory.onHand - inventory.reserved > 0), inventoryState: inventory?.state === "reserved" ? "available" : inventory?.state ?? "unavailable", routingApproved: snapshot.reroutePlans.some((plan) => plan.state === "approved" || plan.state === "executed"), routingOutcome: snapshot.reroutePlans.some((plan) => plan.state === "approved" || plan.state === "executed") ? "approved" : "draft", maintenanceStage: workOrder?.stage ? Math.max(0, workOrder.stage - 1) : 0, maintenanceAssignee: workOrder?.assignee ?? "Unassigned", recoveryScenario: normalizeRecoveryScenario(workOrder?.scenario), procurementState: procurement?.state ?? "draft", procurementNotes: snapshot.procurementMessages.filter((item) => item.kind === "internal_note").map((item) => item.body), shipmentState: shipment?.state === "original" ? "no-impact" : shipment?.state === "notification_pending" ? "notification-pending" : shipment?.state ?? "no-impact", condition: "ready" }); }, [update]);
+  const hydrateCase = useCallback((snapshot: BackendCaseSnapshot | null) => { setActiveCase(snapshot); if (!snapshot) return; const inventory = snapshot.inventory[0]; const workOrder = snapshot.maintenanceWorkOrders[0]; const procurement = snapshot.procurementRequests[0]; const shipment = snapshot.shipmentImpacts[0]; const reroutePlans = snapshot.reroutePlans; const routingOutcome: RoutingOutcome = reroutePlans.some((plan) => plan.state === "executed") ? "executed" : reroutePlans.some((plan) => plan.state === "approved") ? "approved" : reroutePlans.length > 0 ? "review" : "draft"; update({ selectedWorkstationId: snapshot.workstation?.code ?? "", selectedComponentId: snapshot.part?.code ?? "", allocationBlocked: snapshot.allocationLocks.some((lock) => lock.state === "active"), bearingReserved: snapshot.reservations.some((item) => item.status === "active"), inventoryAvailable: Boolean(inventory && inventory.onHand - inventory.reserved > 0), inventoryState: inventory?.state === "reserved" ? "available" : inventory?.state ?? "unavailable", routingApproved: routingOutcome === "approved" || routingOutcome === "executed", routingOutcome, maintenanceStage: workOrder?.stage ? Math.max(0, workOrder.stage - 1) : 0, maintenanceAssignee: workOrder?.assignee ?? "Unassigned", recoveryScenario: normalizeRecoveryScenario(workOrder?.scenario), procurementState: procurement?.state ?? "draft", procurementNotes: snapshot.procurementMessages.filter((item) => item.kind === "internal_note").map((item) => item.body), shipmentState: shipment?.state === "original" ? "no-impact" : shipment?.state === "notification_pending" ? "notification-pending" : shipment?.state ?? "no-impact", condition: "ready" }); }, [update]);
   const executeRefresh = useCallback(async () => {
     const version = ++refreshVersion.current;
     if (stateRef.current.condition !== "ready") {
       dispatch({ type: "patch", patch: { condition: "loading" } });
     }
     try {
-      const [sessionResponse, overviewResponse] = await Promise.all([apiFetch("/api/auth/session"), apiFetch("/api/operations/overview")]);
-      if (!overviewResponse.ok) throw new Error(`Operations API returned ${overviewResponse.status}.`);
+      const sessionResponse = await apiFetch("/api/auth/session");
       const session = sessionResponse.ok ? await sessionResponse.json() as { user: AuthenticatedUser | null } : { user: null };
-      const nextOverview = await overviewResponse.json() as Overview;
       if (version !== refreshVersion.current) return;
       setCurrentUser((prev) => {
         if (!prev && !session.user) return null;
@@ -68,9 +72,19 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
         }
         return session.user;
       });
-      if (session.user && stateRef.current.role !== session.user.role) {
+      if (!session.user) {
+        setOverview(null);
+        hydrateCase(null);
+        dispatch({ type: "patch", patch: { condition: "empty" } });
+        setBackendError(null);
+        return;
+      }
+      if (stateRef.current.role !== session.user.role) {
         update({ role: session.user.role });
       }
+      const overviewResponse = await apiFetch("/api/operations/overview");
+      if (!overviewResponse.ok) throw new Error(`Operations API returned ${overviewResponse.status}.`);
+      const nextOverview = await overviewResponse.json() as Overview;
       setOverview(nextOverview);
       if (nextOverview.activeFailureCaseId) {
         const response = await apiFetch(`/api/failure-cases/${nextOverview.activeFailureCaseId}`);
@@ -172,7 +186,7 @@ export function OperationsProvider({ children }: { children: ReactNode }) {
   const triggerDemo = useCallback(async () => { setRuntimeBusy(true); try { const response = await apiFetch("/api/demo-control/trigger-telemetry", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario: demoScenario }) }, "demo"); if (!response.ok) throw new Error((await response.json() as { message?: string }).message ?? "Demo trigger failed."); await refresh(); return true; } catch (error) { setBackendError(error instanceof Error ? error.message : "Demo trigger failed."); return false; } finally { setRuntimeBusy(false); } }, [demoScenario, refresh]);
   const exitDemo = useCallback(async () => { if (runtime === "demo") await apiFetch("/api/demo-control/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scenario: "golden" }) }, "demo").catch(() => undefined); setApiRuntime("live"); setRuntime("live"); setActiveCase(null); setOverview(null); setCurrentUser(null); }, [runtime]);
   const signOut = useCallback(async () => { await apiFetch("/api/auth/logout", { method: "POST" }).catch(() => undefined); setCurrentUser(null); }, []);
-  const data = useMemo<OperationsData>(() => { if (!overview) return { ...demoOperationsSnapshot, workstations: [], failures: [] }; const failures: FailureCase[] = overview.failureCases.map((item) => ({ ...item, partId: activeCase?.part?.code ?? "Unavailable", detectedAt: "Persisted event", owner: "Production Supervisor" })); const workstations: Workstation[] = overview.workstations.map((item) => { const failure = failures.find((candidate) => candidate.stationId === item.code); const template = demoOperationsSnapshot.workstations.find((candidate) => candidate.id === item.code) ?? demoOperationsSnapshot.workstations[0]; return { ...template, id: item.code, name: item.name, line: item.line, status: statusForUi(item.status), capacity: item.capacityPercent, health: failure?.severity === "critical" ? "Critical" : failure ? "Degraded" : "Healthy", failureProb: failure?.probability ?? 0, predictedComponent: failure?.component ?? "No active prediction", estimatedTTF: failure ? `${failure.ttfHours} Hours` : "—", activeCaseId: failure?.id }; }); return { ...demoOperationsSnapshot, workstations, failures }; }, [activeCase?.part?.code, overview]);
+  const data = useMemo<OperationsData>(() => { if (!overview) return { ...demoOperationsSnapshot, workstations: [...demoOperationsSnapshot.workstations], failures: [...demoOperationsSnapshot.failures] }; const failures: FailureCase[] = overview.failureCases.map((item) => ({ ...item, partId: activeCase?.part?.code ?? "Unavailable", detectedAt: "Persisted event", owner: "Production Supervisor" })); const workstations: Workstation[] = overview.workstations.map((item) => { const failure = failures.find((candidate) => candidate.stationId === item.code); const template = demoOperationsSnapshot.workstations.find((candidate) => candidate.id === item.code) ?? demoOperationsSnapshot.workstations[0]; return { ...template, id: item.code, name: item.name, line: item.line, status: statusForUi(item.status), capacity: item.capacityPercent, health: failure?.severity === "critical" ? "Critical" : failure ? "Degraded" : "Healthy", failureProb: failure?.probability ?? 0, predictedComponent: failure?.component ?? "No active prediction", estimatedTTF: failure ? `${failure.ttfHours} Hours` : "—", activeCaseId: failure?.id }; }); return { ...demoOperationsSnapshot, workstations, failures }; }, [activeCase?.part?.code, overview]);
   const value = useMemo<ContextValue>(() => ({ state, data, overview, activeCase, currentCaseId: overview?.activeFailureCaseId ?? null, runtime, demoScenario, storyMode, runtimeBusy, backendError, realtimeConnected, update, reset: () => dispatch({ type: "reset" }), refresh, runWorkflowCommand, pendingCommand, commandError, clearCommandError: () => setCommandError(null), currentUser, signOut, enterDemo, resetDemo, triggerDemo, exitDemo }), [state, data, overview, activeCase, runtime, demoScenario, storyMode, runtimeBusy, backendError, realtimeConnected, update, refresh, runWorkflowCommand, pendingCommand, commandError, currentUser, signOut, enterDemo, resetDemo, triggerDemo, exitDemo]);
   return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>;
 }

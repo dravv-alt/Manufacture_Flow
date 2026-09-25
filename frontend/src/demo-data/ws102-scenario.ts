@@ -3,6 +3,9 @@ export type DemoBadgeVariant = "outline" | "secondary" | "destructive";
 
 export type NotificationStatus = "unread" | "failed" | "acknowledged";
 
+const scenarioTime = (hoursFromNow: number) => new Date(Date.now() + hoursFromNow * 3600000);
+const scenarioDisplay = (hoursFromNow: number) => scenarioTime(hoursFromNow).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+
 export interface DemoNotification {
   readonly id: string;
   readonly title: string;
@@ -62,13 +65,13 @@ export interface RecoveryScenario {
 export const demoRecoveryScenarios: Readonly<Record<RecoveryScenarioId, RecoveryScenario>> = {
   local: {
     label: "Scenario 1 / local bearing available",
-    availability: "10-Aug-2026 / 06:45 IST",
+    availability: scenarioDisplay(6.25),
     total: "6h 15m",
     steps: [["Part transfer", "45m"], ["Bearing replacement", "2h 30m"], ["Testing", "1h 30m"], ["Quality validation", "1h 30m"]],
   },
   vendor: {
     label: "Scenario 2 / vendor replenishment required",
-    availability: "12-Aug-2026 / 20:30 IST",
+    availability: scenarioDisplay(60),
     total: "60h",
     steps: [["Vendor lead time", "36h"], ["Transportation + inspection", "12h"], ["Bearing replacement", "6h"], ["Testing + quality validation", "6h"]],
   },
@@ -95,9 +98,9 @@ export const demoShipmentStates: Readonly<Record<ShipmentState, { readonly label
 };
 
 export const demoShipmentSchedules = {
-  original: { completion: "09-Aug / 14:00", shipment: "09-Aug / 18:00", delay: "0h" },
-  revised: { completion: "10-Aug / 14:00", shipment: "10-Aug / 18:00", delay: "+6h" },
-  delayed: { completion: "11-Aug / 16:00", shipment: "12-Aug / 09:00", delay: "+24h" },
+  original: { completion: scenarioDisplay(18), shipment: scenarioDisplay(24), delay: "0h" },
+  revised: { completion: scenarioDisplay(24), shipment: scenarioDisplay(30), delay: "+6h" },
+  delayed: { completion: scenarioDisplay(42), shipment: scenarioDisplay(48), delay: "+24h" },
 } as const;
 
 export interface DemoShipmentRoutePoint {
