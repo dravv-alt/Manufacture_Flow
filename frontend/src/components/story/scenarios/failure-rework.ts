@@ -44,7 +44,7 @@ export const failureReworkSteps: StoryStep[] = [
     mode: "action",
     action: {
       type: "workflow",
-      command: { type: "start_maintenance", workOrderId: "WO-WS102-081", expectedStage: 2 },
+      command: { type: "start_maintenance", workOrderId: "WO-WS102-081", expectedStage: 1 },
     },
     evidence: { type: "maintenance_stage", min: 3 },
   },
@@ -100,7 +100,7 @@ export const failureReworkSteps: StoryStep[] = [
     mode: "action",
     action: {
       type: "workflow",
-      command: { type: "record_repair_completion", workOrderId: "WO-WS102-081", expectedStage: 3, notes: "Corrective rework completed" },
+      command: { type: "record_repair_completion", workOrderId: "WO-WS102-081", expectedStage: 5, notes: "Corrective rework completed" },
     },
     evidence: { type: "maintenance_stage", min: 4 },
   },

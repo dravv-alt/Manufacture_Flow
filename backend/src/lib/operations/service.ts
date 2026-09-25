@@ -6,8 +6,11 @@ import { applyMaintenanceExecutionAction, isMaintenanceExecutionAction, Maintena
 export type WorkflowAction =
   | { type: "reserve_part"; actor: string; quantity: number }
   | { type: "schedule_maintenance"; actor: string }
+  | { type: "review_reroute"; actor: string }
+  | { type: "review_reroute_job"; actor: string; jobId: string }
   | { type: "approve_reroute"; actor: string }
   | { type: "execute_reroute"; actor: string }
+  | { type: "confirm_reroute"; actor: string }
   | { type: "advance_maintenance"; actor: string; expectedStage: number }
   | { type: "acknowledge_notification"; actor: string; notificationId: string }
   | { type: "retry_notification"; actor: string; notificationId: string }
@@ -180,9 +183,52 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
       return { action: action.type, idempotent: false, workOrder: updatedWorkOrder, reservation: activeReservation ?? null };
     }
 
+    if (action.type === "review_reroute" || action.type === "review_reroute_job") {
+      const decisions = await tx.select().from(rerouteDecisions).where(eq(rerouteDecisions.failureCaseId, failureCase.id));
+      let candidates = decisions;
+      if (action.type === "review_reroute_job") {
+        const [job] = await tx.select().from(productionJobs).where(eq(productionJobs.externalId, action.jobId)).limit(1);
+        if (!job) throw new OperationNotFoundError(`Production job ${action.jobId} was not found.`);
+        candidates = decisions.filter((decision) => decision.productionJobId === job.id);
+      }
+
+      const recommended = candidates.filter((decision) => decision.outcome === "recommended" && decision.targetWorkstationId !== null);
+      if (recommended.length === 0) {
+        const alreadyReviewed = candidates.some((decision) => ["reviewed", "executed"].includes(decision.outcome));
+        if (!alreadyReviewed) throw new OperationConflictError("There are no feasible reroute recommendations available to review.");
+        return { action: action.type, idempotent: true, reviewedDecisions: candidates.filter((decision) => ["reviewed", "executed"].includes(decision.outcome)) };
+      }
+
+      const reviewedAt = new Date();
+      const reviewed = [] as typeof recommended;
+      for (const decision of recommended) {
+        const [updated] = await tx.update(rerouteDecisions)
+          .set({ outcome: "reviewed", updatedAt: reviewedAt })
+          .where(and(eq(rerouteDecisions.id, decision.id), eq(rerouteDecisions.outcome, "recommended")))
+          .returning();
+        if (!updated) throw new OperationConflictError("A reroute recommendation changed before it could be reviewed. Refresh and retry.");
+        reviewed.push(updated);
+        await tx.insert(workflowEvents).values({
+          failureCaseId: failureCase.id,
+          entityType: "reroute_decision",
+          entityId: updated.id,
+          eventType: action.type === "review_reroute_job" ? "reroute_job_reviewed" : "reroute_reviewed",
+          actor: action.actor,
+          payload: { productionJobId: updated.productionJobId, targetWorkstationId: updated.targetWorkstationId },
+        });
+      }
+      const remaining = await tx.select().from(rerouteDecisions).where(and(eq(rerouteDecisions.failureCaseId, failureCase.id), eq(rerouteDecisions.outcome, "recommended")));
+      await tx.update(failureCases)
+        .set({ workflowState: remaining.length === 0 ? "Reroute reviewed / awaiting approval" : "Reroute review in progress", updatedAt: reviewedAt })
+        .where(eq(failureCases.id, failureCase.id));
+      return { action: action.type, idempotent: false, reviewedDecisions: reviewed };
+    }
+
     if (action.type === "approve_reroute") {
       const drafts = await tx.select().from(reroutePlans).where(and(eq(reroutePlans.failureCaseId, failureCase.id), eq(reroutePlans.state, "draft")));
       if (drafts.length === 0) throw new OperationConflictError("There are no draft reroute recommendations to approve for this failure case.");
+      const unreviewed = await tx.select().from(rerouteDecisions).where(and(eq(rerouteDecisions.failureCaseId, failureCase.id), eq(rerouteDecisions.outcome, "recommended")));
+      if (unreviewed.length > 0) throw new OperationConflictError("Review every reroute recommendation before approval.");
       const approvedAt = new Date();
       const approved = await tx.update(reroutePlans).set({ state: "approved", approvedBy: action.actor, approvedAt, updatedAt: approvedAt }).where(and(eq(reroutePlans.failureCaseId, failureCase.id), eq(reroutePlans.state, "draft"))).returning();
       for (const plan of approved) await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "reroute_plan", entityId: plan.id, eventType: "reroute_approved", actor: action.actor, payload: { affectedJobs: plan.affectedJobs, targetWorkstationId: plan.targetWorkstationId } });
@@ -200,14 +246,34 @@ export async function applyWorkflowAction(externalId: string, action: WorkflowAc
         const [target] = await tx.update(workstations).set({ capacityPercent: sql`${workstations.capacityPercent} + ${job.estimatedLoadPercent}`, updatedAt: new Date() }).where(and(eq(workstations.id, plan.targetWorkstationId), sql`${workstations.capacityPercent} + ${job.estimatedLoadPercent} <= 100`)).returning();
         if (!target) throw new OperationConflictError(`The approved target no longer has capacity for ${job.externalId}.`);
         await tx.update(productionJobs).set({ workstationId: plan.targetWorkstationId, rerouteEvaluationRequired: false, rerouteEvaluationReason: null, updatedAt: new Date() }).where(eq(productionJobs.id, job.id));
-        const [decision] = await tx.update(rerouteDecisions).set({ outcome: "executed", updatedAt: new Date() }).where(and(eq(rerouteDecisions.failureCaseId, failureCase.id), eq(rerouteDecisions.productionJobId, job.id), eq(rerouteDecisions.outcome, "recommended"))).returning();
-        if (!decision) throw new OperationConflictError(`No matching recommendation exists for ${job.externalId}.`);
+        const [decision] = await tx.update(rerouteDecisions).set({ outcome: "executed", updatedAt: new Date() }).where(and(eq(rerouteDecisions.failureCaseId, failureCase.id), eq(rerouteDecisions.productionJobId, job.id), eq(rerouteDecisions.outcome, "reviewed"))).returning();
+        if (!decision) throw new OperationConflictError(`No reviewed recommendation exists for ${job.externalId}.`);
         await tx.update(reroutePlans).set({ state: "executed", updatedAt: new Date() }).where(eq(reroutePlans.id, plan.id));
         await tx.insert(workflowEvents).values({ failureCaseId: failureCase.id, entityType: "reroute_decision", entityId: decision.id, eventType: "production_job_rerouted", actor: action.actor, payload: { productionJobId: job.id, targetWorkstationId: plan.targetWorkstationId } });
         executed.push(job.externalId);
       }
       await tx.update(failureCases).set({ workflowState: "Production reroute executed / confirmation pending", updatedAt: new Date() }).where(eq(failureCases.id, failureCase.id));
       return { action: action.type, executedJobs: executed };
+    }
+
+    if (action.type === "confirm_reroute") {
+      const plans = await tx.select().from(reroutePlans).where(eq(reroutePlans.failureCaseId, failureCase.id));
+      if (!plans.some((plan) => plan.state === "executed") || plans.some((plan) => ["draft", "approved"].includes(plan.state))) {
+        throw new OperationConflictError("Execute every approved reroute before confirmation.");
+      }
+      const existing = await tx.select().from(workflowEvents).where(and(eq(workflowEvents.failureCaseId, failureCase.id), eq(workflowEvents.eventType, "reroute_confirmed"))).limit(1);
+      if (existing[0]) return { action: action.type, idempotent: true };
+      const confirmedAt = new Date();
+      await tx.insert(workflowEvents).values({
+        failureCaseId: failureCase.id,
+        entityType: "reroute_plan",
+        entityId: failureCase.id,
+        eventType: "reroute_confirmed",
+        actor: action.actor,
+        payload: { executedPlanCount: plans.filter((plan) => plan.state === "executed").length },
+      });
+      await tx.update(failureCases).set({ workflowState: "Production reroute confirmed / maintenance execution ready", updatedAt: confirmedAt }).where(eq(failureCases.id, failureCase.id));
+      return { action: action.type, idempotent: false };
     }
 
     if (action.type === "advance_maintenance") {

@@ -5,8 +5,11 @@ const actor = z.string().trim().min(2).max(120);
 export const workflowActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("reserve_part"), actor, quantity: z.number().int().min(1).max(100) }),
   z.object({ type: z.literal("schedule_maintenance"), actor }),
+  z.object({ type: z.literal("review_reroute"), actor }),
+  z.object({ type: z.literal("review_reroute_job"), actor, jobId: z.string().trim().min(1).max(120) }),
   z.object({ type: z.literal("approve_reroute"), actor }),
   z.object({ type: z.literal("execute_reroute"), actor }),
+  z.object({ type: z.literal("confirm_reroute"), actor }),
   z.object({ type: z.literal("advance_maintenance"), actor, expectedStage: z.number().int().min(1).max(7) }),
   z.object({ type: z.literal("start_maintenance"), actor, workOrderId: z.string().uuid(), expectedStage: z.number().int().min(1).max(3), notes: z.string().trim().min(1).max(2000).optional() }),
   z.object({ type: z.literal("record_repair_completion"), actor, workOrderId: z.string().uuid(), expectedStage: z.number().int().min(3).max(6), notes: z.string().trim().min(1).max(2000) }),
