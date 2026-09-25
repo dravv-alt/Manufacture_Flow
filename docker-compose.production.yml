@@ -20,11 +20,19 @@ services:
     depends_on: { db: { condition: service_healthy } }
     ports: ["3001:3001"]
     networks: [private, public]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/api/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
   frontend:
-    build: { context: ., dockerfile: frontend/Dockerfile }
-    environment:
-      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set NEXT_PUBLIC_API_BASE_URL}
-    depends_on: [backend]
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?set NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_OPERATIONS_MODE: ${NEXT_PUBLIC_OPERATIONS_MODE:-backend}
+    depends_on: { backend: { condition: service_healthy } }
     ports: ["3000:3000"]
     networks: [public]
 networks: { private: { internal: true }, public: {} }
