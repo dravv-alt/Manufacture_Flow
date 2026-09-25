@@ -1,14 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 
+function normalizeOrigin(value: string) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value.trim().replace(/\/$/, "");
+  }
+}
+
+function allowedOrigins() {
+  return (process.env.FRONTEND_ORIGIN ?? "http://localhost:3000")
+    .split(",")
+    .map(normalizeOrigin)
+    .filter(Boolean);
+}
+
 function corsHeaders(response: NextResponse, origin: string) {
-  const allowedOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:3000";
-  if (origin === allowedOrigin || origin === allowedOrigin.replace("localhost", "127.0.0.1")) {
+  const requestedOrigin = normalizeOrigin(origin);
+  const configuredOrigins = allowedOrigins();
+  const localAliases = configuredOrigins.map((configuredOrigin) => configuredOrigin.replace("localhost", "127.0.0.1"));
+  if (configuredOrigins.includes(requestedOrigin) || localAliases.includes(requestedOrigin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set("Access-Control-Allow-Credentials", "true");
-    response.headers.set("Vary", "Origin");
   }
+  response.headers.set("Vary", "Origin");
   response.headers.set("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-  response.headers.set("Access-Control-Allow-Headers", "Content-Type, X-Telemetry-Api-Key, Last-Event-ID");
+  response.headers.set("Access-Control-Allow-Headers", "Accept, Content-Type, X-Telemetry-Api-Key, Last-Event-ID");
+  response.headers.set("Access-Control-Max-Age", "600");
   return response;
 }
 

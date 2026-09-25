@@ -7,6 +7,7 @@ import { runtimeMode } from "@/lib/runtime/config";
 
 export const SESSION_COOKIE = `manufacture_flow_${runtimeMode}_session`;
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
+const sessionSameSite: "lax" | "none" = process.env.NODE_ENV === "production" && process.env.FRONTEND_ORIGIN ? "none" : "lax";
 
 export type AuthenticatedUser = {
   id: string;
@@ -26,7 +27,7 @@ export async function createSession(user: AuthenticatedUser) {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: sessionSameSite,
     secure: process.env.NODE_ENV === "production",
     expires: expiresAt,
     path: "/",
@@ -48,5 +49,5 @@ export async function revokeCurrentSession() {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (token) await db.update(authSessions).set({ revokedAt: new Date(), updatedAt: new Date() }).where(eq(authSessions.tokenHash, hashToken(token)));
-  cookieStore.set(SESSION_COOKIE, "", { httpOnly: true, sameSite: "lax", expires: new Date(0), path: "/" });
+  cookieStore.set(SESSION_COOKIE, "", { httpOnly: true, sameSite: sessionSameSite, secure: process.env.NODE_ENV === "production", expires: new Date(0), path: "/" });
 }

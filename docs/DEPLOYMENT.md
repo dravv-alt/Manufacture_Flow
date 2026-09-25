@@ -20,7 +20,7 @@ NEXT_PUBLIC_DEMO_API_BASE_URL=https://<demo-api-domain>
 
 `NEXT_PUBLIC_API_BASE_URL` is retained as the compatibility fallback. The explicit live and demo variables are recommended because the UI switches API targets when the user enters or exits Demo Mode. Do not put `DATABASE_URL`, database credentials, or backend-only secrets in Vercel.
 
-The repository root is the Vercel project root. The checked-in `vercel.json` builds only `frontend/` and points Vercel at `frontend/.next`; do not override the Output Directory back to `.next`. The backend is built and deployed separately through Railway.
+The repository root is the Vercel project root. The checked-in `vercel.json` builds only `frontend/` and points Vercel at `frontend/.next`; do not override the Output Directory back to `.next`. The backend is built and deployed separately through Railway. Set `FRONTEND_ORIGIN` to the exact Vercel origin, without a path or trailing slash. Multiple production/preview origins may be comma-separated.
 
 ## Railway API services
 
