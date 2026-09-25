@@ -202,27 +202,29 @@ npm run build
 
 ### 3. Vercel + Railway deployment
 
-Deploy `frontend/` to Vercel and `backend/` to Railway. The browser must use a public HTTPS backend URL; it cannot resolve the Docker service name `backend`.
+Deploy `frontend/` to Vercel and two Railway API services from the same backend Dockerfile. The browser must use public HTTPS backend URLs; it cannot resolve the Docker service name `backend`.
 
 Vercel frontend variables:
 
 ```text
 NEXT_PUBLIC_OPERATIONS_MODE=backend
-NEXT_PUBLIC_API_BASE_URL=https://<railway-backend-domain>
+NEXT_PUBLIC_API_BASE_URL=https://<live-api-domain>
+NEXT_PUBLIC_LIVE_API_BASE_URL=https://<live-api-domain>
+NEXT_PUBLIC_DEMO_API_BASE_URL=https://<demo-api-domain>
 ```
 
-Railway backend variables must include distinct database URLs and the allowed frontend origin:
+The live Railway service uses `APP_RUNTIME=live`. The demo Railway service uses `APP_RUNTIME=demo` and must point to the isolated demo database. Both services must be configured with distinct database URLs and the allowed frontend origin. `NEXT_PUBLIC_DEMO_API_BASE_URL` is the public HTTPS domain of the demo service; never set it to `localhost:3002` in Vercel.
 
 ```text
 APP_RUNTIME=live
 DATABASE_URL=<live-database-url>
 LIVE_DATABASE_URL=<live-database-url>
-DEMO_DATABASE_URL=<separate-demo-database-url>
+DEMO_DATABASE_URL=<isolated-demo-database-url>
 FRONTEND_ORIGIN=https://<vercel-frontend-domain>
 TELEMETRY_INGEST_API_KEY=<long-random-secret>
 ```
 
-Run the complete migration lineage as a Railway release/one-time command before traffic reaches the service, then verify `GET /api/health`, sign-in, one authorized workflow action, audit history, and notification history. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the exact migration and Docker sequence.
+Run the matching migration for each Railway service as a release/one-time command before traffic reaches it, then verify both health endpoints, sign-in, Demo Mode reset/telemetry, one authorized live workflow action, audit history, and notification history. See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the complete variable matrix and Docker sequence.
 
 ### 4. Verification status and known limitations
 
